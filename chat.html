@@ -14,7 +14,11 @@
     .hero { text-align: center; margin-top: 8px; }
     .hero img { width: 120px; height: 120px; border-radius: 50%; border: 3px solid #66fcf1; object-fit: cover; }
     h1 { margin: 12px 0 16px; text-align: center; }
-    .chat { background: #111417; border-radius: 16px; padding: 16px; min-height: 50vh; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .chat {
+      background: #111417; border-radius: 16px; padding: 16px;
+      min-height: 50vh; display: flex; flex-direction: column; gap: 12px;
+      overflow-y: auto; scroll-behavior: smooth; /* <- smooth auto-scroll */
+    }
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
     .msg { padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word; }
@@ -27,7 +31,7 @@
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .toolbar { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,1,1); white-space: nowrap; border: 0; }
-    audio { display: none; }
+    audio { display: none; } /* hide the audio bar */
     .status { font-size: 0.9em; opacity: 0.8; }
   </style>
 </head>
@@ -73,6 +77,10 @@
     const AVATAR_SRC = "marty.jpg?t=1";
     let userHasInteracted = false;
 
+    function scrollToBottom() {
+      chat.scrollTop = chat.scrollHeight;
+    }
+
     function addBubble(text, who) {
       const row = document.createElement("div");
       row.className = `row ${who}`;
@@ -98,7 +106,7 @@
 
       row.appendChild(bubble);
       chat.appendChild(row);
-      chat.scrollTop = chat.scrollHeight;
+      scrollToBottom(); // keep view pinned to latest
       return bubble;
     }
 
@@ -115,7 +123,7 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      userHasInteracted = true; // First click or key press
+      userHasInteracted = true; // first click or key press unlocks audio autoplay
 
       const text = input.value.trim();
       if (!text) return;
@@ -135,6 +143,7 @@
       try {
         const data = await sendToMarty(mine.textContent);
         thinking.textContent = data.text || "(no response)";
+        scrollToBottom(); // ensure we see the completed reply
         statusEl.textContent = "Ready";
 
         if (data.audioUrl) {
@@ -156,7 +165,7 @@
     });
 
     micBtn.addEventListener("click", () => {
-      userHasInteracted = true;
+      userHasInteracted = true; // unlock audio autoplay path
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         alert("Speech recognition not supported in this browser. Try Chrome on desktop.");
