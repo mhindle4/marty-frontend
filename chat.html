@@ -27,7 +27,7 @@
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .toolbar { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,1,1); white-space: nowrap; border: 0; }
-    audio { width: 100%; margin-top: 8px; }
+    audio { display: none; }
     .status { font-size: 0.9em; opacity: 0.8; }
   </style>
 </head>
@@ -56,14 +56,13 @@
     </form>
 
     <div class="toolbar">
-      <audio id="player" controls preload="auto" aria-label="Marty audio reply"></audio>
+      <audio id="player" preload="auto" aria-label="Marty audio reply"></audio>
       <span id="status" class="status" role="status" aria-live="polite">Ready</span>
     </div>
   </div>
 
   <script>
     const API_BASE = "https://marty-backend.onrender.com";
-
     const chat = document.getElementById("chat");
     const form = document.getElementById("chatForm");
     const input = document.getElementById("message");
@@ -72,6 +71,7 @@
     const player = document.getElementById("player");
     const statusEl = document.getElementById("status");
     const AVATAR_SRC = "marty.jpg?t=1";
+    let userHasInteracted = false;
 
     function addBubble(text, who) {
       const row = document.createElement("div");
@@ -115,6 +115,8 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      userHasInteracted = true; // First click or key press
+
       const text = input.value.trim();
       if (!text) return;
 
@@ -137,7 +139,9 @@
 
         if (data.audioUrl) {
           player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
-          try { await player.play(); } catch {}
+          if (userHasInteracted) {
+            try { await player.play(); } catch {}
+          }
         }
       } catch (err) {
         thinking.textContent = "Error talking to server.";
@@ -152,6 +156,7 @@
     });
 
     micBtn.addEventListener("click", () => {
+      userHasInteracted = true;
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         alert("Speech recognition not supported in this browser. Try Chrome on desktop.");
