@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Contact</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0b0c10; color: #eaf0f1; }
+    .shell { max-width: 800px; margin: 0 auto; padding: 24px 16px 32px; }
+    nav { margin-bottom: 24px; text-align: center; }
+    nav a { color: #66fcf1; margin: 0 12px; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    h1 { margin: 8px 0 16px; text-align: center; }
+    p { line-height: 1.6; margin-bottom: 1em; }
+    form { display: grid; gap: 12px; max-width: 500px; margin: 0 auto; }
+    input, textarea { padding: 10px; border-radius: 8px; border: 1px solid #2b2f36; background:#0d1117; color:#eaf0f1; }
+    button { padding: 12px 16px; border: 0; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; cursor: pointer; }
+    button:hover { background: #66fcf1; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="chat.html">Chat</a>
+      <a href="about.html">About</a>
+      <a href="contact.html" aria-current="page">Contact</a>
+    </nav>
+
+    <h1>Contact Me</h1>
+    <p>
+      Have feedback about Marty or want to get in touch?  
+      Fill out the form below, and I’ll get back to you.
+    </p>
+
+    <form>
+      <input type="text" name="name" placeholder="Your name" required />
+      <input type="email" name="email" placeholder="Your email" required />
+      <textarea name="message" placeholder="Your message" rows="5" required></textarea>
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</body>
+</html>

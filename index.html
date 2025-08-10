@@ -1,5 +1,40 @@
-<!-- after (relative links) -->
-<a href="index.html">Home</a>
-<a href="chat.html">Chat</a>
-<a href="about.html">About</a>
-<a href="contact.html">Contact</a>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Welcome to Marty</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0b0c10; color: #eaf0f1; }
+    .shell { max-width: 800px; margin: 0 auto; padding: 24px 16px 32px; text-align: center; }
+    nav { margin-bottom: 24px; text-align: center; }
+    nav a { color: #66fcf1; margin: 0 12px; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    h1 { margin: 8px 0 16px; }
+    p { line-height: 1.6; margin-bottom: 1em; }
+    .cta { display: inline-block; padding: 12px 20px; margin-top: 12px; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; text-decoration: none; }
+    .cta:hover { background: #66fcf1; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav aria-label="Primary">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="chat.html">Chat</a>
+      <a href="about.html">About</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+
+    <h1>Welcome to Marty</h1>
+    <p>
+      Marty is my AI chatbot, trained to sound and speak like me.  
+      You can chat by typing or speaking, and Marty will respond in real-time with my voice.
+    </p>
+    <p>
+      Click below to start chatting and experience the future of personal AI conversation.
+    </p>
+    <a class="cta" href="chat.html">Start Chatting</a>
+  </div>
+</body>
+</html>
