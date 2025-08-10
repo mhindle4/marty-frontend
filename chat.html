@@ -14,6 +14,7 @@
     .hero { text-align: center; margin-top: 8px; }
     .hero img { width: 120px; height: 120px; border-radius: 50%; border: 3px solid #66fcf1; object-fit: cover; }
     h1 { margin: 12px 0 16px; text-align: center; }
+
     .chat {
       background: #111417; border-radius: 16px; padding: 16px;
       min-height: 50vh; display: flex; flex-direction: column; gap: 12px;
@@ -21,37 +22,51 @@
     }
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
-    .msg { padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word; }
+
+    /* Fade-in for message bubbles */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .msg {
+      padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word;
+      opacity: 0; animation: fadeInUp 220ms ease-out both;
+    }
     .me .msg { background: #1f2833; }
     .bot .msg { background: #0e6655; }
     .avatar { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px; object-fit: cover; border: 2px solid #2b2f36; }
+
+    /* Typing indicator (three bouncing dots) */
+    .typing { background: #0e6655; }
+    .dots { display: inline-flex; gap: 4px; vertical-align: middle; }
+    .dot { width: 6px; height: 6px; background: #cfeee9; border-radius: 50%; opacity: 0.6; animation: bounce 1s infinite ease-in-out; }
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); opacity: 1; } }
+
     form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 0; align-items: center; }
     input[type="text"] { padding: 12px; border-radius: 10px; border: 1px solid #2b2f36; background:#0d1117; color:#eaf0f1; }
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .toolbar { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,1,1); white-space: nowrap; border: 0; }
-    audio { display: none; }
-    .status { display: none; } /* hide Ready text completely */
+    audio { display: none; }                 /* hide the audio bar */
+    .status { display: none; }               /* hide any visible status text */
+
     /* Scroll to bottom button */
     #scrollBtn {
-      position: fixed;
-      bottom: 90px;
-      right: 20px;
-      background: #45a29e;
-      color: #0b0c10;
-      border: none;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      font-size: 24px;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      position: fixed; bottom: 90px; right: 20px;
+      background: #45a29e; color: #0b0c10; border: none; border-radius: 50%;
+      width: 50px; height: 50px; font-size: 24px;
+      display: none; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
     #scrollBtn:hover { background: #66fcf1; }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .chat { scroll-behavior: auto; }
+      .msg { animation: none; opacity: 1; }
+      .dot { animation: none; opacity: .8; }
+    }
   </style>
 </head>
 <body>
@@ -103,7 +118,7 @@
       chat.scrollTop = chat.scrollHeight;
     }
 
-    function addBubble(text, who) {
+    function addRow(who) {
       const row = document.createElement("div");
       row.className = `row ${who}`;
       row.setAttribute("role", "group");
@@ -121,15 +136,35 @@
         spacer.style.height = "40px";
         row.appendChild(spacer);
       }
+      return row;
+    }
 
+    function addBubble(text, who) {
+      const row = addRow(who);
       const bubble = document.createElement("div");
       bubble.className = "msg";
       bubble.textContent = text;
-
       row.appendChild(bubble);
       chat.appendChild(row);
       scrollToBottom();
       return bubble;
+    }
+
+    // --- Typing indicator ---
+    function addTypingBubble() {
+      const row = addRow("bot");
+      const bubble = document.createElement("div");
+      bubble.className = "msg typing";
+      const wrapper = document.createElement("span");
+      wrapper.className = "dots";
+      wrapper.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+      bubble.appendChild(wrapper);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      scrollToBottom();
+
+      // return a cleanup function to remove typing bubble
+      return () => row.remove();
     }
 
     async function sendToMarty(text) {
@@ -154,17 +189,21 @@
       mine.classList.add("me");
 
       input.value = "";
-      const thinking = addBubble("…thinking…", "bot");
-      thinking.parentElement.classList.add("bot");
-      thinking.classList.add("bot");
+
+      // Show typing dots while waiting
+      const removeTyping = addTypingBubble();
 
       sendBtn.disabled = true;
       micBtn.disabled = true;
 
       try {
         const data = await sendToMarty(mine.textContent);
-        thinking.textContent = data.text || "(no response)";
-        scrollToBottom();
+
+        // Replace typing with final message
+        removeTyping();
+        const reply = addBubble(data.text || "(no response)", "bot");
+        reply.parentElement.classList.add("bot");
+        reply.classList.add("bot");
 
         if (data.audioUrl) {
           player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
@@ -173,7 +212,10 @@
           }
         }
       } catch (err) {
-        thinking.textContent = "Error talking to server.";
+        removeTyping();
+        const errBubble = addBubble("Error talking to server.", "bot");
+        errBubble.parentElement.classList.add("bot");
+        errBubble.classList.add("bot");
         console.error(err);
         alert("Couldn’t reach the server. Please try again.");
       } finally {
@@ -200,23 +242,12 @@
       micBtn.textContent = "🎙️";
       rec.start();
 
-      rec.onresult = (e) => {
-        const transcript = e.results[0][0].transcript;
-        input.value = transcript;
+      rec.onresult = () => {
+        input.value = rec.results[0][0].transcript;
         form.requestSubmit();
       };
-
-      rec.onend = () => {
-        micBtn.disabled = false;
-        micBtn.textContent = "🎤";
-      };
-
-      rec.onerror = (e) => {
-        console.error("Speech error:", e.error);
-        micBtn.disabled = false;
-        micBtn.textContent = "🎤";
-        alert("Mic error: " + e.error);
-      };
+      rec.onend = () => { micBtn.disabled = false; micBtn.textContent = "🎤"; };
+      rec.onerror = (e) => { console.error("Speech error:", e.error); micBtn.disabled = false; micBtn.textContent = "🎤"; alert("Mic error: " + e.error); };
     });
 
     // Show/hide scroll-to-bottom button
@@ -224,8 +255,6 @@
       const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
       scrollBtn.style.display = atBottom ? "none" : "flex";
     });
-
-    // Scroll to bottom when button clicked
     scrollBtn.addEventListener("click", scrollToBottom);
   </script>
 </body>
