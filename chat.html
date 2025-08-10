@@ -20,21 +20,22 @@
       min-height: 50vh; display: flex; flex-direction: column; gap: 12px;
       overflow-y: auto; scroll-behavior: smooth;
     }
+
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px; object-fit: cover; border: 2px solid #2b2f36; }
+    .spacer { width: 40px; height: 40px; }
 
-    /* Fade-in for message bubbles */
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .msg {
       padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word;
       opacity: 0; animation: fadeInUp 220ms ease-out both;
     }
     .me .msg { background: #1f2833; }
-    .bot .msg { background: #0e6655; }
-    .avatar { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px; object-fit: cover; border: 2px solid #2b2f36; }
+    .bot .msg { background: #0e6655; position: relative; }
 
-    /* Typing indicator (three bouncing dots) */
-    .typing { background: #0e6655; }
+    /* Typing dots */
+    .typing.msg { background: #0e6655; }
     .dots { display: inline-flex; gap: 4px; vertical-align: middle; }
     .dot { width: 6px; height: 6px; background: #cfeee9; border-radius: 50%; opacity: 0.6; animation: bounce 1s infinite ease-in-out; }
     .dot:nth-child(2) { animation-delay: .15s; }
@@ -46,12 +47,26 @@
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    .toolbar { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,1,1); white-space: nowrap; border: 0; }
-    audio { display: none; }                 /* hide the audio bar */
-    .status { display: none; }               /* hide any visible status text */
+    audio { display: none; }  /* hide audio bar */
+    .status { display: none; }
 
-    /* Scroll to bottom button */
+    /* Speaking visualizer inside bubble */
+    .speaking {
+      display: inline-flex; align-items: flex-end; gap: 3px; height: 16px; margin-left: 8px;
+    }
+    .speaking .bar {
+      width: 3px; height: 4px; background: #66fcf1; border-radius: 1px;
+      animation: eq 1s infinite ease-in-out;
+    }
+    .speaking .bar:nth-child(2) { animation-delay: .1s; }
+    .speaking .bar:nth-child(3) { animation-delay: .2s; }
+    .speaking .bar:nth-child(4) { animation-delay: .3s; }
+    @keyframes eq {
+      0%, 100% { height: 4px; opacity: .7; }
+      50% { height: 16px; opacity: 1; }
+    }
+
+    /* Scroll to bottom */
     #scrollBtn {
       position: fixed; bottom: 90px; right: 20px;
       background: #45a29e; color: #0b0c10; border: none; border-radius: 50%;
@@ -61,11 +76,14 @@
     }
     #scrollBtn:hover { background: #66fcf1; }
 
-    /* Respect reduced motion */
-    @media (prefers-reduced-motion: reduce) {
-      .chat { scroll-behavior: auto; }
-      .msg { animation: none; opacity: 1; }
-      .dot { animation: none; opacity: .8; }
+    /* Mic push-to-talk */
+    #mic.listening {
+      background: #e85d75; color: #0b0c10; animation: micPulse 1s infinite;
+    }
+    @keyframes micPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(232,93,117,0.6); }
+      70%  { box-shadow: 0 0 0 14px rgba(232,93,117,0); }
+      100% { box-shadow: 0 0 0 0 rgba(232,93,117,0); }
     }
   </style>
 </head>
@@ -86,24 +104,21 @@
 
     <div id="chat" class="chat" aria-live="polite" aria-label="Conversation"></div>
 
-    <form id="chatForm" autocomplete="off" aria-label="Send a message to Marty">
-      <label class="sr-only" for="message">Message</label>
-      <input id="message" type="text" placeholder="Say hi to Marty…" aria-required="true" />
-      <button type="submit" id="sendBtn" title="Send message" aria-label="Send message">Send</button>
-      <button type="button" id="mic" aria-label="Start voice input" title="Speak a message">🎤</button>
+    <form id="chatForm" autocomplete="off">
+      <input id="message" type="text" placeholder="Say hi to Marty…" />
+      <button type="submit" id="sendBtn">Send</button>
+      <button type="button" id="mic" aria-label="Hold to talk" title="Hold to talk">🎤</button>
     </form>
 
-    <div class="toolbar">
-      <audio id="player" preload="auto" aria-label="Marty audio reply"></audio>
-      <span id="status" class="status" role="status" aria-live="polite">Ready</span>
-    </div>
+    <audio id="player" preload="auto"></audio>
   </div>
 
-  <!-- Scroll to bottom button -->
   <button id="scrollBtn" title="Scroll to bottom">⬇</button>
 
   <script>
     const API_BASE = "https://marty-backend.onrender.com";
+    const AVATAR_SRC = "marty.jpg?t=1";
+
     const chat = document.getElementById("chat");
     const form = document.getElementById("chatForm");
     const input = document.getElementById("message");
@@ -111,19 +126,14 @@
     const sendBtn = document.getElementById("sendBtn");
     const player = document.getElementById("player");
     const scrollBtn = document.getElementById("scrollBtn");
-    const AVATAR_SRC = "marty.jpg?t=1";
+
     let userHasInteracted = false;
 
-    function scrollToBottom() {
-      chat.scrollTop = chat.scrollHeight;
-    }
+    function scrollToBottom() { chat.scrollTop = chat.scrollHeight; }
 
     function addRow(who) {
       const row = document.createElement("div");
       row.className = `row ${who}`;
-      row.setAttribute("role", "group");
-      row.setAttribute("aria-label", who === "bot" ? "Marty message" : "Your message");
-
       if (who === "bot") {
         const img = document.createElement("img");
         img.src = AVATAR_SRC;
@@ -132,8 +142,7 @@
         row.appendChild(img);
       } else {
         const spacer = document.createElement("div");
-        spacer.style.width = "40px";
-        spacer.style.height = "40px";
+        spacer.className = "spacer";
         row.appendChild(spacer);
       }
       return row;
@@ -150,7 +159,6 @@
       return bubble;
     }
 
-    // --- Typing indicator ---
     function addTypingBubble() {
       const row = addRow("bot");
       const bubble = document.createElement("div");
@@ -162,8 +170,6 @@
       row.appendChild(bubble);
       chat.appendChild(row);
       scrollToBottom();
-
-      // return a cleanup function to remove typing bubble
       return () => row.remove();
     }
 
@@ -180,44 +186,38 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       userHasInteracted = true;
-
       const text = input.value.trim();
       if (!text) return;
 
       const mine = addBubble(text, "me");
-      mine.parentElement.classList.add("me");
-      mine.classList.add("me");
-
       input.value = "";
 
-      // Show typing dots while waiting
       const removeTyping = addTypingBubble();
-
       sendBtn.disabled = true;
       micBtn.disabled = true;
 
       try {
         const data = await sendToMarty(mine.textContent);
-
-        // Replace typing with final message
         removeTyping();
         const reply = addBubble(data.text || "(no response)", "bot");
-        reply.parentElement.classList.add("bot");
-        reply.classList.add("bot");
+
+        // Add speaking visualizer inside bot bubble
+        const speakViz = document.createElement("span");
+        speakViz.className = "speaking";
+        speakViz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
+        reply.appendChild(speakViz);
 
         if (data.audioUrl) {
           player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
-          if (userHasInteracted) {
-            try { await player.play(); } catch {}
-          }
+          player.addEventListener("playing", () => speakViz.style.display = "inline-flex");
+          player.addEventListener("ended", () => speakViz.style.display = "none");
+          player.addEventListener("pause", () => speakViz.style.display = "none");
+          if (userHasInteracted) { try { await player.play(); } catch {} }
         }
       } catch (err) {
         removeTyping();
-        const errBubble = addBubble("Error talking to server.", "bot");
-        errBubble.parentElement.classList.add("bot");
-        errBubble.classList.add("bot");
+        addBubble("Error talking to server.", "bot");
         console.error(err);
-        alert("Couldn’t reach the server. Please try again.");
       } finally {
         sendBtn.disabled = false;
         micBtn.disabled = false;
@@ -225,32 +225,56 @@
       }
     });
 
-    micBtn.addEventListener("click", () => {
-      userHasInteracted = true;
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert("Speech recognition not supported in this browser. Try Chrome on desktop.");
-        return;
-      }
+    // Push-to-talk mic
+    const RECO_LANG = "en-GB";
+    let rec = null, listening = false, stopping = false, interimText = "", finalText = "";
 
-      const rec = new SpeechRecognition();
-      rec.lang = "en-US";
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
-
-      micBtn.disabled = true;
-      micBtn.textContent = "🎙️";
-      rec.start();
-
-      rec.onresult = () => {
-        input.value = rec.results[0][0].transcript;
-        form.requestSubmit();
+    function createRecognizer() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { alert("Speech recognition not supported in this browser."); return null; }
+      const r = new SR();
+      r.lang = RECO_LANG;
+      r.interimResults = true;
+      r.continuous = true;
+      r.maxAlternatives = 1;
+      r.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          if (res.isFinal) { finalText += res[0].transcript + " "; interimText = ""; }
+          else { interimText = res[0].transcript; }
+        }
+        input.value = (finalText + " " + interimText).trim();
       };
-      rec.onend = () => { micBtn.disabled = false; micBtn.textContent = "🎤"; };
-      rec.onerror = (e) => { console.error("Speech error:", e.error); micBtn.disabled = false; micBtn.textContent = "🎤"; alert("Mic error: " + e.error); };
-    });
+      r.onend = () => {
+        if (stopping) { stopping = false; micBtn.classList.remove("listening"); listening = false; if (input.value.trim()) form.requestSubmit(); }
+        else { micBtn.classList.remove("listening"); listening = false; }
+      };
+      r.onerror = (e) => { console.error("Speech error:", e.error); micBtn.classList.remove("listening"); listening = false; stopping = false; };
+      return r;
+    }
 
-    // Show/hide scroll-to-bottom button
+    function startPTT(ev) {
+      ev.preventDefault();
+      userHasInteracted = true;
+      if (listening) return;
+      rec = createRecognizer();
+      if (!rec) return;
+      interimText = ""; finalText = "";
+      input.value = "";
+      stopping = false;
+      listening = true;
+      micBtn.classList.add("listening");
+      try { rec.start(); } catch {}
+    }
+
+    function stopPTT() { if (!listening || !rec) return; stopping = true; try { rec.stop(); } catch {} }
+
+    micBtn.addEventListener("mousedown", startPTT);
+    window.addEventListener("mouseup", stopPTT);
+    micBtn.addEventListener("touchstart", (e) => { startPTT(e); }, { passive: false });
+    window.addEventListener("touchend", () => { stopPTT(); });
+
+    // Scroll button
     chat.addEventListener("scroll", () => {
       const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
       scrollBtn.style.display = atBottom ? "none" : "flex";
