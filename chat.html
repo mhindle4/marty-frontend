@@ -40,31 +40,28 @@
       <a href="contact.html">Contact</a>
     </nav>
 
-    <!-- Top profile image -->
     <div class="hero">
-      <!-- Replace marty.jpg with your actual filename -->
-      <img src="marty.jpg" alt="Marty">
+      <img src="marty.jpg?t=1" alt="Marty profile photo">
     </div>
 
     <h1>Chat with Marty</h1>
 
     <div id="chat" class="chat" aria-live="polite" aria-label="Conversation"></div>
 
-    <form id="chatForm" autocomplete="off">
+    <form id="chatForm" autocomplete="off" aria-label="Send a message to Marty">
       <label class="sr-only" for="message">Message</label>
-      <input id="message" type="text" placeholder="Say hi to Marty…" />
-      <button type="submit" id="sendBtn" title="Send message">Send</button>
+      <input id="message" type="text" placeholder="Say hi to Marty…" aria-required="true" />
+      <button type="submit" id="sendBtn" title="Send message" aria-label="Send message">Send</button>
       <button type="button" id="mic" aria-label="Start voice input" title="Speak a message">🎤</button>
     </form>
 
     <div class="toolbar">
       <audio id="player" controls preload="auto" aria-label="Marty audio reply"></audio>
-      <span id="status" class="status" role="status" aria-live="polite"></span>
+      <span id="status" class="status" role="status" aria-live="polite">Ready</span>
     </div>
   </div>
 
   <script>
-    // Replace this with your actual Render backend URL
     const API_BASE = "https://marty-backend.onrender.com";
 
     const chat = document.getElementById("chat");
@@ -74,28 +71,32 @@
     const sendBtn = document.getElementById("sendBtn");
     const player = document.getElementById("player");
     const statusEl = document.getElementById("status");
-    const AVATAR_SRC = "marty.jpg"; // same image used for message avatar
+    const AVATAR_SRC = "marty.jpg?t=1";
 
     function addBubble(text, who) {
-      // Row wrapper controls layout + avatar
       const row = document.createElement("div");
       row.className = `row ${who}`;
+      row.setAttribute("role", "group");
+      row.setAttribute("aria-label", who === "bot" ? "Marty message" : "Your message");
 
       if (who === "bot") {
         const img = document.createElement("img");
         img.src = AVATAR_SRC;
-        img.alt = "Marty";
+        img.alt = "Marty avatar";
         img.className = "avatar";
         row.appendChild(img);
+      } else {
+        const spacer = document.createElement("div");
+        spacer.style.width = "40px";
+        spacer.style.height = "40px";
+        row.appendChild(spacer);
       }
 
       const bubble = document.createElement("div");
-      bubble.className = `msg`;
+      bubble.className = "msg";
       bubble.textContent = text;
 
-      // Put bubble in row (order depends on who)
       row.appendChild(bubble);
-
       chat.appendChild(row);
       chat.scrollTop = chat.scrollHeight;
       return bubble;
@@ -117,9 +118,7 @@
       const text = input.value.trim();
       if (!text) return;
 
-      // User bubble (right side, no avatar)
       const mine = addBubble(text, "me");
-      // Let CSS know it's a "me" row to color the bubble
       mine.parentElement.classList.add("me");
       mine.classList.add("me");
 
@@ -137,7 +136,6 @@
         statusEl.textContent = "Ready";
 
         if (data.audioUrl) {
-          // absolute URL + cache-buster so the browser doesn't reuse old audio
           player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
           try { await player.play(); } catch {}
         }
@@ -145,6 +143,7 @@
         thinking.textContent = "Error talking to server.";
         statusEl.textContent = "Error";
         console.error(err);
+        alert("Couldn’t reach the server. Please try again.");
       } finally {
         sendBtn.disabled = false;
         micBtn.disabled = false;
@@ -152,7 +151,6 @@
       }
     });
 
-    // Voice input with Web Speech API (best in Chrome)
     micBtn.addEventListener("click", () => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -190,8 +188,6 @@
         alert("Mic error: " + e.error);
       };
     });
-
-    statusEl.textContent = "Ready";
   </script>
 </body>
 </html>
