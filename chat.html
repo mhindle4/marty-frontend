@@ -1,3 +1,5 @@
+
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,13 +8,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root { color-scheme: dark; }
-    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0b0c10; color: #eaf0f1; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0b0c10; color:#eaf0f1; }
     .shell { max-width: 800px; margin: 0 auto; padding: 24px 16px 32px; }
     nav { margin-bottom: 24px; text-align: center; }
-    nav a { color: #66fcf1; margin: 0 12px; text-decoration: none; }
+    nav a { color:#66fcf1; margin: 0 12px; text-decoration: none; }
     nav a:hover { text-decoration: underline; }
-    .hero { text-align: center; margin-top: 8px; }
 
+    .hero { text-align: center; margin-top: 8px; }
     .marty-video {
       width: 200px; height: 200px;
       border-radius: 50%;
@@ -21,12 +23,20 @@
       transition: box-shadow 0.3s ease, opacity 0.35s ease, filter 0.35s ease;
     }
     .marty-video.speaking {
-      box-shadow: 0 0 20px 6px rgba(102, 252, 241, 0.7);
+      box-shadow: 0 0 20px 6px rgba(102,252,241,0.7);
       animation: pulseGlow 1.5s infinite alternate;
+      opacity: 1;
+      filter: none;
+    }
+    .marty-video.fadeout {
+      animation: none;
+      box-shadow: 0 0 8px 2px rgba(102,252,241,0.35);
+      opacity: 0.9;
+      filter: saturate(0.9);
     }
     @keyframes pulseGlow {
-      from { box-shadow: 0 0 10px 2px rgba(102, 252, 241, 0.5); }
-      to   { box-shadow: 0 0 20px 6px rgba(102, 252, 241, 0.9); }
+      from { box-shadow: 0 0 10px 2px rgba(102,252,241,0.5); }
+      to   { box-shadow: 0 0 20px 6px rgba(102,252,241,0.9); }
     }
 
     h1 { margin: 12px 0 16px; text-align: center; }
@@ -39,32 +49,39 @@
 
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
-    .avatar { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px; object-fit: cover; border: 2px solid #2b2f36; }
-    .spacer { width: 40px; height: 40px; }
-
-    .msg { padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word; animation: fadeInUp 220ms ease-out both; }
-    .me .msg { background: #1f2833; }
-    .bot .msg { background: #0e6655; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .msg { padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word;
+           animation: fadeInUp 220ms ease-out both; }
+    .me .msg { background:#1f2833; }
+    .bot .msg { background:#0e6655; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
 
     form { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 0; align-items: center; }
     input[type="text"] { padding: 12px; border-radius: 10px; border: 1px solid #2b2f36; background:#0d1117; color:#eaf0f1; }
-    button { padding: 12px 16px; border: 0; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; cursor: pointer; }
+    button { padding: 12px 16px; border: 0; border-radius: 10px; background:#45a29e; color:#0b0c10; font-weight: 700; cursor:pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* Mic push-to-talk button */
+    /* Push-to-talk mic button */
     #mic.listening {
       background: #e85d75 !important; 
-      color: #fff;
+      color:#fff;
       animation: micPulse 1s infinite;
     }
     @keyframes micPulse {
-      0%   { box-shadow: 0 0 0 0 rgba(232,93,117,0.6); }
-      70%  { box-shadow: 0 0 0 14px rgba(232,93,117,0); }
-      100% { box-shadow: 0 0 0 0 rgba(232,93,117,0); }
+      0% { box-shadow: 0 0 0 0 rgba(232,93,117,0.6); }
+      70%{ box-shadow: 0 0 0 14px rgba(232,93,117,0); }
+      100%{ box-shadow: 0 0 0 0 rgba(232,93,117,0); }
     }
 
-    audio { display: none; }
+    /* Speaking visualiser bars */
+    .speaking-bars {
+      display:inline-flex; align-items:flex-end; gap:3px; height:16px; margin-left:8px;
+    }
+    .speaking-bars .bar {
+      width:3px; height:4px; background:#66fcf1; border-radius:1px;
+      transition: height 0.1s ease;
+    }
+
+    audio { display:none; }
   </style>
 </head>
 <body>
@@ -105,123 +122,119 @@
     const sendBtn = document.getElementById("sendBtn");
     const player = document.getElementById("player");
     const playFallback = document.getElementById("playFallback");
+    const martyVideo = document.getElementById("martyVideo");
 
     let userHasInteracted = false;
 
-    function scrollToBottom() { chat.scrollTop = chat.scrollHeight; }
-    function addBubble(text, who) {
-      const row = document.createElement("div");
-      row.className = `row ${who}`;
-      const bubble = document.createElement("div");
-      bubble.className = "msg";
-      bubble.textContent = text;
-      row.appendChild(bubble);
-      chat.appendChild(row);
-      scrollToBottom();
-      return bubble;
+    function scrollToBottom(){ chat.scrollTop = chat.scrollHeight; }
+    function addBubble(text, who){
+      const row=document.createElement("div"); row.className=`row ${who}`;
+      const bubble=document.createElement("div"); bubble.className="msg"; bubble.textContent=text;
+      row.appendChild(bubble); chat.appendChild(row); scrollToBottom(); return bubble;
     }
-
-    async function sendToMarty(text) {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
-      });
-      if (!res.ok) throw new Error("Server error " + res.status);
+    async function sendToMarty(text){
+      const res=await fetch(`${API_BASE}/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+      if(!res.ok) throw new Error("Server error "+res.status);
       return res.json();
     }
+    function resolveAudioUrl(u){ if(!u) return null; return /^https?:\/\//i.test(u)?u:`${API_BASE}${u}`; }
+    async function tryPlay(){ try{ await player.play(); playFallback.style.display="none"; } catch{ playFallback.style.display="inline-block"; } }
+    playFallback.addEventListener("click",()=>tryPlay());
 
-    // Audio helpers
-    function resolveAudioUrl(u) {
-      if (!u) return null;
-      if (/^https?:\/\//i.test(u)) return u;
-      return `${API_BASE}${u}`;
+    // --- Visualiser ---
+    let audioCtx, analyser, dataArray, sourceNode, rafId;
+    function setupAnalyser(){
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      if(sourceNode){ try{sourceNode.disconnect();}catch{}; try{analyser.disconnect();}catch{} }
+      sourceNode=audioCtx.createMediaElementSource(player);
+      analyser=audioCtx.createAnalyser();
+      analyser.fftSize=64;
+      dataArray=new Uint8Array(analyser.frequencyBinCount);
+      sourceNode.connect(analyser); analyser.connect(audioCtx.destination);
     }
-    async function tryPlay() {
-      try { await player.play(); playFallback.style.display = "none"; }
-      catch { playFallback.style.display = "inline-block"; }
+    function animateBars(viz){
+      if(!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+      const avgLow=dataArray.slice(0,5).reduce((a,b)=>a+b,0)/5;
+      const avgMid=dataArray.slice(5,15).reduce((a,b)=>a+b,0)/10;
+      const avgHigh=dataArray.slice(15,30).reduce((a,b)=>a+b,0)/15;
+      const bars=viz.querySelectorAll(".bar");
+      if(bars.length>=4){
+        bars[0].style.height=Math.max(4,avgLow/8)+"px";
+        bars[1].style.height=Math.max(4,avgMid/8)+"px";
+        bars[2].style.height=Math.max(4,avgHigh/8)+"px";
+        bars[3].style.height=Math.max(4,(avgMid+avgHigh)/16)+"px";
+      }
+      rafId=requestAnimationFrame(()=>animateBars(viz));
     }
-    playFallback.addEventListener("click", () => tryPlay());
+    function stopBars(){ if(rafId) cancelAnimationFrame(rafId); }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      userHasInteracted = true;
-      const text = input.value.trim();
-      if (!text) return;
-      addBubble(text, "me");
-      input.value = "";
+    // --- Video glow ---
+    function startSpeakingEffect(){
+      try{ martyVideo.currentTime=0; }catch{}
+      martyVideo.play().catch(()=>{});
+      martyVideo.classList.remove("fadeout");
+      martyVideo.classList.add("speaking");
+    }
+    function stopSpeakingEffect(){
+      martyVideo.classList.remove("speaking");
+      martyVideo.classList.add("fadeout");
+      setTimeout(()=>{ try{martyVideo.pause();}catch{} },350);
+      stopBars();
+    }
 
-      const replyBubble = addBubble("…thinking…", "bot");
-      try {
-        const data = await sendToMarty(text);
-        replyBubble.textContent = data.text || "(no response)";
-        if (data.audioUrl) {
-          player.src = resolveAudioUrl(data.audioUrl);
+    // --- Chat flow ---
+    form.addEventListener("submit",async e=>{
+      e.preventDefault(); userHasInteracted=true;
+      const text=input.value.trim(); if(!text) return;
+      addBubble(text,"me"); input.value="";
+      const reply=addBubble("…thinking…","bot");
+
+      try{
+        const data=await sendToMarty(text);
+        reply.textContent=data.text||"(no response)";
+        if(data.audioUrl){
+          const viz=document.createElement("span");
+          viz.className="speaking-bars";
+          viz.innerHTML='<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
+          reply.appendChild(viz);
+
+          player.src=resolveAudioUrl(data.audioUrl);
+          player.addEventListener("playing",async()=>{
+            viz.style.display="inline-flex";
+            setupAnalyser(); try{await audioCtx.resume();}catch{}
+            animateBars(viz); startSpeakingEffect();
+          },{once:true});
+          ["ended","pause","error"].forEach(ev=>{
+            player.addEventListener(ev,()=>{ viz.style.display="none"; stopSpeakingEffect(); },{once:true});
+          });
           await tryPlay();
         }
-      } catch (err) {
-        replyBubble.textContent = "Error contacting Marty.";
-      }
+      }catch(err){ reply.textContent="Error talking to Marty."; console.error(err); }
     });
 
-    /* ---------- Push-to-Talk microphone ---------- */
-    const RECO_LANG = "en-GB";
-    let rec = null, listening = false, stopping = false, interimText = "", finalText = "";
-
-    function createRecognizer() {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) { alert("Speech recognition not supported. Try Chrome."); return null; }
-      const r = new SR();
-      r.lang = RECO_LANG; r.interimResults = true; r.continuous = true; r.maxAlternatives = 1;
-
-      r.onresult = (e) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const res = e.results[i];
-          if (res.isFinal) { finalText += res[0].transcript + " "; interimText = ""; }
-          else { interimText = res[0].transcript; }
+    // --- Push-to-Talk mic ---
+    const RECO_LANG="en-GB"; let rec=null,listening=false,stopping=false,interimText="",finalText="";
+    function createRecognizer(){
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(!SR){ alert("Speech recognition not supported. Try Chrome."); return null; }
+      const r=new SR(); r.lang=RECO_LANG; r.interimResults=true; r.continuous=true; r.maxAlternatives=1;
+      r.onresult=e=>{
+        for(let i=e.resultIndex;i<e.results.length;i++){
+          const res=e.results[i];
+          if(res.isFinal){ finalText+=res[0].transcript+" "; interimText=""; }
+          else{ interimText=res[0].transcript; }
         }
-        input.value = (finalText + " " + interimText).trim();
+        input.value=(finalText+" "+interimText).trim();
       };
-
-      r.onend = () => {
-        if (stopping) {
-          stopping = false; micBtn.classList.remove("listening"); listening = false;
-          if (input.value.trim()) form.requestSubmit();
-        } else {
-          micBtn.classList.remove("listening"); listening = false;
-        }
-      };
-
-      r.onerror = (e) => {
-        console.error("Speech error:", e.error);
-        micBtn.classList.remove("listening"); listening = false; stopping = false;
-        if (e.error === "not-allowed") alert("Mic permission blocked. Allow mic in browser.");
-      };
+      r.onend=()=>{ if(stopping){ stopping=false; micBtn.classList.remove("listening"); listening=false; if(input.value.trim()) form.requestSubmit(); } else{ micBtn.classList.remove("listening"); listening=false; } };
+      r.onerror=e=>{ console.error("Speech error:",e.error); micBtn.classList.remove("listening"); listening=false; stopping=false; if(e.error==="not-allowed") alert("Mic permission blocked. Allow mic in browser."); };
       return r;
     }
-
-    function startPTT(ev) {
-      ev.preventDefault();
-      if (listening) return;
-      rec = createRecognizer();
-      if (!rec) return;
-      interimText = ""; finalText = ""; input.value = "";
-      stopping = false; listening = true;
-      micBtn.classList.add("listening");
-      try { rec.start(); } catch {}
-    }
-
-    function stopPTT() {
-      if (!listening || !rec) return;
-      stopping = true;
-      try { rec.stop(); } catch {}
-    }
-
-    micBtn.addEventListener("mousedown", startPTT);
-    window.addEventListener("mouseup", stopPTT);
-    micBtn.addEventListener("touchstart", (e) => { startPTT(e); }, { passive: false });
-    window.addEventListener("touchend", () => { stopPTT(); });
+    function startPTT(ev){ ev.preventDefault(); userHasInteracted=true; if(listening) return; rec=createRecognizer(); if(!rec) return; interimText=""; finalText=""; input.value=""; stopping=false; listening=true; micBtn.classList.add("listening"); try{rec.start();}catch{} }
+    function stopPTT(){ if(!listening||!rec) return; stopping=true; try{rec.stop();}catch{} }
+    micBtn.addEventListener("mousedown",startPTT); window.addEventListener("mouseup",stopPTT);
+    micBtn.addEventListener("touchstart",e=>{ startPTT(e); },{passive:false}); window.addEventListener("touchend",()=>{ stopPTT(); });
   </script>
 </body>
 </html>
-
-
