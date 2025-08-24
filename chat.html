@@ -1,3 +1,5 @@
+
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -99,7 +101,7 @@
 
     <div class="hero">
       <video autoplay loop muted playsinline class="marty-video">
-        <source src="marty-loop-final.mp4?t=1" type="video/mp4">
+        <source src="marty-loop-small.mp4?t=1" type="video/mp4">
         Your browser does not support the video tag.
       </video>
     </div>
@@ -121,9 +123,217 @@
 
   <script>
     const API_BASE = "https://marty-backend.onrender.com";
-    const AVATAR_SRC = "marty.jpg?t=1";
-    // ... (rest of your JavaScript unchanged)
+    const AVATAR_SRC = "marty-avatar.jpg?t=1"; // updated avatar snapshot
+
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("chatForm");
+    const input = document.getElementById("message");
+    const micBtn = document.getElementById("mic");
+    const sendBtn = document.getElementById("sendBtn");
+    const player = document.getElementById("player");
+    const scrollBtn = document.getElementById("scrollBtn");
+
+    let userHasInteracted = false;
+
+    function scrollToBottom() { chat.scrollTop = chat.scrollHeight; }
+
+    function addRow(who) {
+      const row = document.createElement("div");
+      row.className = `row ${who}`;
+      if (who === "bot") {
+        const img = document.createElement("img");
+        img.src = AVATAR_SRC;
+        img.alt = "Marty avatar";
+        img.className = "avatar";
+        row.appendChild(img);
+      } else {
+        const spacer = document.createElement("div");
+        spacer.className = "spacer";
+        row.appendChild(spacer);
+      }
+      return row;
+    }
+
+    function addBubble(text, who) {
+      const row = addRow(who);
+      const bubble = document.createElement("div");
+      bubble.className = "msg";
+      bubble.textContent = text;
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      scrollToBottom();
+      return bubble;
+    }
+
+    function addTypingBubble() {
+      const row = addRow("bot");
+      const bubble = document.createElement("div");
+      bubble.className = "msg typing";
+      const wrapper = document.createElement("span");
+      wrapper.className = "dots";
+      wrapper.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+      bubble.appendChild(wrapper);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      scrollToBottom();
+      return { row, bubble, remove: () => row.remove(), replaceWith: (node) => row.replaceWith(node) };
+    }
+
+    async function sendToMarty(text) {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+      if (!res.ok) throw new Error("Server error: " + res.status);
+      return res.json();
+    }
+
+    function buildSpeakingOnlyBubble() {
+      const row = addRow("bot");
+      const bubble = document.createElement("div");
+      bubble.className = "msg";
+      bubble.textContent = "";
+      const viz = document.createElement("span");
+      viz.className = "speaking";
+      viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
+      bubble.appendChild(viz);
+      row.appendChild(bubble);
+      return { row, bubble, viz };
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      userHasInteracted = true;
+      const text = input.value.trim();
+      if (!text) return;
+
+      const mine = addBubble(text, "me");
+      input.value = "";
+
+      let typing = addTypingBubble();
+      let typingActive = true;
+      let speakingBubble = null;
+
+      sendBtn.disabled = true;
+      micBtn.disabled = true;
+
+      const onPlaying = () => {
+        if (typingActive) {
+          speakingBubble = buildSpeakingOnlyBubble();
+          typing.replaceWith(speakingBubble.row);
+          typingActive = false;
+          scrollToBottom();
+        }
+      };
+      const onStopSpeak = () => {};
+
+      player.addEventListener("playing", onPlaying, { once: true });
+      player.addEventListener("ended", onStopSpeak, { once: true });
+      player.addEventListener("error", onStopSpeak, { once: true });
+
+      try {
+        const data = await sendToMarty(mine.textContent);
+
+        if (typingActive) { typing.remove(); typingActive = false; }
+
+        if (speakingBubble) {
+          speakingBubble.bubble.textContent = data.text || "(no response)";
+        } else {
+          const reply = addBubble(data.text || "(no response)", "bot");
+          const viz = document.createElement("span");
+          viz.className = "speaking";
+          viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
+          reply.appendChild(viz);
+          speakingBubble = { row: reply.parentElement, bubble: reply, viz };
+        }
+
+        if (data.audioUrl) {
+          player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
+          const showViz = () => speakingBubble && (speakingBubble.viz.style.display = "inline-flex");
+          const hideViz = () => speakingBubble && (speakingBubble.viz.style.display = "none");
+          player.addEventListener("playing", showViz);
+          player.addEventListener("ended", hideViz);
+          player.addEventListener("pause", hideViz);
+          player.addEventListener("stalled", hideViz);
+          player.addEventListener("error", hideViz);
+          try { if (userHasInteracted) await player.play(); } catch {}
+        }
+      } catch (err) {
+        if (typingActive) { typing.remove(); typingActive = false; }
+        addBubble("Error talking to server.", "bot");
+        console.error(err);
+      } finally {
+        sendBtn.disabled = false;
+        micBtn.disabled = false;
+        input.focus();
+      }
+    });
+
+    const RECO_LANG = "en-GB";
+    let rec = null, listening = false, stopping = false, interimText = "", finalText = "";
+
+    function createRecognizer() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { alert("Speech recognition not supported in this browser. Try Chrome on desktop."); return null; }
+      const r = new SR();
+      r.lang = RECO_LANG;
+      r.interimResults = true;
+      r.continuous = true;
+      r.maxAlternatives = 1;
+
+      r.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          if (res.isFinal) { finalText += res[0].transcript + " "; interimText = ""; }
+          else { interimText = res[0].transcript; }
+        }
+        input.value = (finalText + " " + interimText).trim();
+      };
+
+      r.onend = () => {
+        if (stopping) { stopping = false; micBtn.classList.remove("listening"); listening = false; if (input.value.trim()) form.requestSubmit(); }
+        else { micBtn.classList.remove("listening"); listening = false; }
+      };
+
+      r.onerror = (e) => {
+        console.error("Speech error:", e.error);
+        micBtn.classList.remove("listening");
+        listening = false;
+        stopping = false;
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          alert("Microphone permission is blocked. Click the padlock in the address bar and allow the mic.");
+        }
+      };
+      return r;
+    }
+
+    function startPTT(ev) {
+      ev.preventDefault();
+      userHasInteracted = true;
+      if (listening) return;
+      rec = createRecognizer();
+      if (!rec) return;
+      interimText = ""; finalText = "";
+      input.value = "";
+      stopping = false;
+      listening = true;
+      micBtn.classList.add("listening");
+      try { rec.start(); } catch {}
+    }
+
+    function stopPTT() { if (!listening || !rec) return; stopping = true; try { rec.stop(); } catch {} }
+
+    micBtn.addEventListener("mousedown", startPTT);
+    window.addEventListener("mouseup", stopPTT);
+    micBtn.addEventListener("touchstart", (e) => { startPTT(e); }, { passive: false });
+    window.addEventListener("touchend", () => { stopPTT(); });
+
+    chat.addEventListener("scroll", () => {
+      const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
+      scrollBtn.style.display = atBottom ? "none" : "flex";
+    });
+    scrollBtn.addEventListener("click", scrollToBottom);
   </script>
 </body>
 </html>
-
