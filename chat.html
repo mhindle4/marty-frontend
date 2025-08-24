@@ -1,3 +1,5 @@
+
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,7 +19,8 @@
     .marty-video {
       width: 200px; height: 200px; border-radius: 50%;
       border: 3px solid #66fcf1; object-fit: cover;
-      transition: box-shadow .3s ease, opacity .35s ease, filter .35s ease;
+      transition: transform 0.1s ease, box-shadow .3s ease, opacity .35s ease, filter .35s ease;
+      opacity: .95; filter: saturate(.95);
     }
     .marty-video.speaking {
       box-shadow: 0 0 20px 6px rgba(102,252,241,.7);
@@ -39,7 +42,14 @@
 
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
-    .msg { padding: 12px 14px; border-radius: 12px; max-width: 75%; word-wrap: break-word;
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      flex: 0 0 32px; object-fit: cover;
+      border: 2px solid #2b2f36; background:#1f2833; color:#eaf0f1;
+      display:flex; align-items:center; justify-content:center;
+      font-size: 12px; font-weight: 700;
+    }
+    .msg { padding: 12px 14px; border-radius: 12px; max-width: calc(75% - 40px); word-wrap: break-word;
            animation: fadeInUp 220ms ease-out both; }
     .me .msg { background:#1f2833; }
     .bot .msg { background:#0e6655; }
@@ -50,7 +60,7 @@
     button { padding: 12px 16px; border: 0; border-radius: 10px; background:#45a29e; color:#0b0c10; font-weight: 700; cursor:pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* Push-to-talk mic button */
+    /* Push-to-talk mic */
     #mic.listening {
       background: #e85d75 !important; 
       color:#fff; animation: micPulse 1s infinite;
@@ -61,7 +71,7 @@
       100%{ box-shadow: 0 0 0 0 rgba(232,93,117,0); }
     }
 
-    /* Speaking visualiser bars */
+    /* Speaking bars */
     .speaking-bars { display:inline-flex; align-items:flex-end; gap:3px; height:16px; margin-left:8px; }
     .speaking-bars .bar { width:3px; height:4px; background:#66fcf1; border-radius:1px; transition: height .1s ease; }
 
@@ -70,7 +80,7 @@
 </head>
 <body>
   <div class="shell">
-    <nav aria-label="Primary">
+    <nav>
       <a href="index.html">Home</a>
       <a href="chat.html" aria-current="page">Chat</a>
       <a href="about.html">About</a>
@@ -99,6 +109,8 @@
 
   <script>
     const API_BASE = "https://marty-backend.onrender.com";
+    const BOT_AVATAR = "favicon.png";
+
     const chat = document.getElementById("chat");
     const form = document.getElementById("chatForm");
     const input = document.getElementById("message");
@@ -111,39 +123,58 @@
     let userHasInteracted = false;
 
     function scrollToBottom(){ chat.scrollTop = chat.scrollHeight; }
-    function addBubble(text, who){
-      const row=document.createElement("div"); row.className=`row ${who}`;
-      const bubble=document.createElement("div"); bubble.className="msg"; bubble.textContent=text;
-      row.appendChild(bubble); chat.appendChild(row); scrollToBottom(); return bubble;
+
+    function makeRow(who) {
+      const row = document.createElement("div");
+      row.className = `row ${who}`;
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+
+      if (who === "bot") {
+        const img = new Image();
+        img.src = BOT_AVATAR;
+        img.alt = "Marty";
+        img.className = "avatar";
+        img.onerror = () => { avatar.textContent = "M"; row.prepend(avatar); };
+        img.onload  = () => { row.prepend(img); };
+      } else {
+        avatar.textContent = "You";
+        row.append(avatar);
+      }
+      return row;
     }
+
+    function addBubble(text, who) {
+      const row = makeRow(who);
+      const bubble = document.createElement("div");
+      bubble.className = "msg";
+      bubble.textContent = text;
+      if (who === "bot") { row.appendChild(bubble); }
+      else { row.prepend(bubble); }
+      chat.appendChild(row);
+      scrollToBottom();
+      return bubble;
+    }
+
     async function sendToMarty(text){
       const res=await fetch(`${API_BASE}/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
       if(!res.ok) throw new Error("Server error "+res.status);
       return res.json();
     }
-    function resolveAudioUrl(u){ if(!u) return null; return /^https?:\/\//i.test(u)?(u):(`${API_BASE}${u}`); }
+    function resolveAudioUrl(u){ if(!u) return null; return /^https?:\/\//i.test(u)?u:`${API_BASE}${u}`; }
     async function tryPlay(){ try{ await player.play(); playFallback.style.display="none"; } catch{ playFallback.style.display="inline-block"; } }
     playFallback.addEventListener("click",()=>tryPlay());
 
-    /* ---------- Single, reusable Web Audio graph (FIX) ---------- */
-    let audioCtx = null, sourceNode = null, analyser = null, dataArray = null, rafId = null;
-
+    let audioCtx=null, sourceNode=null, analyser=null, dataArray=null, rafBars=null, rafVideo=null;
     function ensureAudioGraph() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (!sourceNode) {
-        // Create ONCE per page lifetime
-        sourceNode = audioCtx.createMediaElementSource(player);
-      }
+      if (!sourceNode) { sourceNode = audioCtx.createMediaElementSource(player); }
       if (!analyser) {
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
+        analyser = audioCtx.createAnalyser(); analyser.fftSize=64;
         dataArray = new Uint8Array(analyser.frequencyBinCount);
-        // Connect once: player -> analyser -> destination
-        sourceNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
+        sourceNode.connect(analyser); analyser.connect(audioCtx.destination);
       }
     }
-
     function animateBars(viz){
       if (!analyser) return;
       analyser.getByteFrequencyData(dataArray);
@@ -157,25 +188,33 @@
         bars[2].style.height=Math.max(4,avgHigh/8)+"px";
         bars[3].style.height=Math.max(4,(avgMid+avgHigh)/16)+"px";
       }
-      rafId=requestAnimationFrame(()=>animateBars(viz));
+      rafBars=requestAnimationFrame(()=>animateBars(viz));
     }
-    function stopBars(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; }
+    function stopBars(){ if(rafBars) cancelAnimationFrame(rafBars); rafBars=null; }
 
-    /* ---------- Video glow control ---------- */
+    function animateVideoToAudio() {
+      if (!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+      const avg = dataArray.reduce((a,b)=>a+b,0) / dataArray.length;
+      const intensity = Math.min(1, avg/100);
+      const scale = 1 + intensity * 0.03;
+      const rotate = (intensity*4 - 2).toFixed(2);
+      martyVideo.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+      rafVideo=requestAnimationFrame(animateVideoToAudio);
+    }
+    function stopVideoAnimation(){ if(rafVideo) cancelAnimationFrame(rafVideo); rafVideo=null; martyVideo.style.transform=""; }
+
     function startSpeakingEffect(){
-      try{ martyVideo.currentTime = 0; }catch{}
+      try{ martyVideo.currentTime=0; }catch{}
       martyVideo.play().catch(()=>{});
-      martyVideo.classList.remove("fadeout");
-      martyVideo.classList.add("speaking");
+      martyVideo.classList.remove("fadeout"); martyVideo.classList.add("speaking");
     }
     function stopSpeakingEffect(){
-      martyVideo.classList.remove("speaking");
-      martyVideo.classList.add("fadeout");
+      martyVideo.classList.remove("speaking"); martyVideo.classList.add("fadeout");
       setTimeout(()=>{ try{ martyVideo.pause(); }catch{} }, 350);
-      stopBars();
+      stopBars(); stopVideoAnimation();
     }
 
-    /* ---------- Chat flow ---------- */
     form.addEventListener("submit",async e=>{
       e.preventDefault(); userHasInteracted=true;
       const text=input.value.trim(); if(!text) return;
@@ -185,40 +224,29 @@
       try{
         const data=await sendToMarty(text);
         reply.textContent=data.text||"(no response)";
-
         if(data.audioUrl){
           const viz=document.createElement("span");
           viz.className="speaking-bars";
           viz.innerHTML='<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
           reply.appendChild(viz);
 
-          const url = resolveAudioUrl(data.audioUrl);
-          if (url) {
-            player.crossOrigin = "anonymous";
-            player.src = url;
-
-            player.addEventListener("playing", async () => {
-              viz.style.display = "inline-flex";
-              ensureAudioGraph();            // <-- create/reuse ONCE
-              try { await audioCtx.resume(); } catch {}
-              animateBars(viz);
-              startSpeakingEffect();
-            }, { once: true });
-
-            const stopOnce = () => { viz.style.display="none"; stopSpeakingEffect(); };
-            player.addEventListener("ended",  stopOnce, { once: true });
-            player.addEventListener("pause",  stopOnce, { once: true });
-            player.addEventListener("error",  stopOnce, { once: true });
-
+          const url=resolveAudioUrl(data.audioUrl);
+          if(url){
+            player.crossOrigin="anonymous"; player.src=url;
+            player.addEventListener("playing",async()=>{
+              viz.style.display="inline-flex";
+              ensureAudioGraph(); try{ await audioCtx.resume(); }catch{}
+              animateBars(viz); startSpeakingEffect(); animateVideoToAudio();
+            },{once:true});
+            const stopOnce=()=>{ viz.style.display="none"; stopSpeakingEffect(); };
+            ["ended","pause","error"].forEach(ev=>player.addEventListener(ev,stopOnce,{once:true}));
             await tryPlay();
           }
         }
-      }catch(err){
-        reply.textContent="Error talking to Marty."; console.error(err);
-      }
+      }catch(err){ reply.textContent="Error talking to Marty."; console.error(err); }
     });
 
-    /* ---------- Push-to-Talk mic ---------- */
+    /* Push-to-talk mic */
     const RECO_LANG="en-GB"; let rec=null,listening=false,stopping=false,interimText="",finalText="";
     function createRecognizer(){
       const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -243,4 +271,3 @@
   </script>
 </body>
 </html>
-
