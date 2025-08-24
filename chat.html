@@ -19,23 +19,20 @@
       border-radius: 50%;
       border: 3px solid #66fcf1;
       object-fit: cover;
-      /* smooth visual transitions */
       transition: box-shadow 0.3s ease, opacity 0.35s ease, filter 0.35s ease;
-      opacity: 0.95;               /* calm idle look */
+      opacity: 0.95;
       filter: saturate(0.95);
     }
-    /* Glow + active look while speaking */
     .marty-video.speaking {
       box-shadow: 0 0 20px 6px rgba(102, 252, 241, 0.7);
       animation: pulseGlow 1.5s infinite alternate;
       opacity: 1;
       filter: none;
     }
-    /* Fade-out when finishing speaking (pause on last frame) */
     .marty-video.fadeout {
-      animation: none;                 /* stop glow animation */
+      animation: none;
       box-shadow: 0 0 8px 2px rgba(102, 252, 241, 0.35);
-      opacity: 0.88;                   /* gentle fade, not to 0 */
+      opacity: 0.88;
       filter: saturate(0.9);
     }
 
@@ -77,7 +74,6 @@
     .me .msg { background: #1f2833; }
     .bot .msg { background: #0e6655; position: relative; }
 
-    /* Typing dots */
     .typing.msg { background: #0e6655; }
     .dots { display: inline-flex; gap: 4px; vertical-align: middle; }
     .dot { width: 6px; height: 6px; background: #cfeee9; border-radius: 50%; opacity: 0.6; animation: bounce 1s infinite ease-in-out; }
@@ -92,7 +88,6 @@
 
     audio { display: none; }
 
-    /* Real audio bars */
     .speaking-bars {
       display: inline-flex; align-items: flex-end; gap: 3px; height: 16px; margin-left: 8px;
     }
@@ -149,7 +144,9 @@
       <button type="button" id="mic" aria-label="Hold to talk" title="Hold to talk">🎤</button>
     </form>
 
-    <audio id="player" preload="auto"></audio>
+    <!-- Updated audio with CORS + fallback -->
+    <audio id="player" preload="auto" crossorigin="anonymous"></audio>
+    <button id="playFallback" style="display:none;margin-top:8px;">▶ Play reply</button>
   </div>
 
   <button id="scrollBtn" title="Scroll to bottom">⬇</button>
@@ -164,11 +161,30 @@
     const micBtn = document.getElementById("mic");
     const sendBtn = document.getElementById("sendBtn");
     const player = document.getElementById("player");
+    const playFallback = document.getElementById("playFallback");
     const scrollBtn = document.getElementById("scrollBtn");
     const martyVideo = document.getElementById("martyVideo");
 
     let userHasInteracted = false;
     let lastBotAvatar = null;
+
+    function resolveAudioUrl(u) {
+      if (!u) return null;
+      if (/^https?:\/\//i.test(u)) return u + (u.includes("?") ? "&" : "?") + "t=" + Date.now();
+      return `${API_BASE}${u}${u.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    }
+
+    async function tryPlay() {
+      try {
+        await player.play();
+        playFallback.style.display = "none";
+        return true;
+      } catch (e) {
+        playFallback.style.display = "inline-block";
+        return false;
+      }
+    }
+    playFallback.addEventListener("click", () => tryPlay());
 
     function scrollToBottom() { chat.scrollTop = chat.scrollHeight; }
 
@@ -238,8 +254,7 @@
       sourceNode = audioCtx.createMediaElementSource(player);
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
-      const bufferLength = analyser.frequencyBinCount;
-      dataArray = new Uint8Array(bufferLength);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
       sourceNode.connect(analyser);
       analyser.connect(audioCtx.destination);
     }
@@ -258,36 +273,25 @@
       }
       rafId = requestAnimationFrame(() => animateBars(vizElement));
     }
-    function stopBars() {
-      if (rafId) cancelAnimationFrame(rafId);
-    }
+    function stopBars() { if (rafId) cancelAnimationFrame(rafId); }
 
     /* ---------- Speaking visual effects (video + avatar) ---------- */
     function startSpeakingEffect() {
-      // rewind to start BEFORE each play so it doesn't resume mid-frame
       try { martyVideo.currentTime = 0; } catch {}
       martyVideo.play().catch(() => {});
-      martyVideo.classList.remove("fadeout");  // remove any fade from prior speak
+      martyVideo.classList.remove("fadeout");
       martyVideo.classList.add("speaking");
       if (lastBotAvatar) lastBotAvatar.classList.add("speaking");
     }
-
-    // Smooth fade then pause on last frame (no snap to 0)
     function stopSpeakingEffect() {
       martyVideo.classList.remove("speaking");
       martyVideo.classList.add("fadeout");
       if (lastBotAvatar) lastBotAvatar.classList.remove("speaking");
-      // Wait for the CSS fade to complete (~350ms), then pause (keeps current frame)
-      setTimeout(() => {
-        try { martyVideo.pause(); } catch {}
-        // DO NOT reset currentTime here — we want the "freeze frame" look.
-      }, 360);
+      setTimeout(() => { try { martyVideo.pause(); } catch {} }, 360);
       stopBars();
     }
 
     /* ---------- Chat flow ---------- */
-    let lastViz = null; // track viz of the current bot message
-
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       userHasInteracted = true;
@@ -312,31 +316,32 @@
         viz.className = "speaking-bars";
         viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
         reply.appendChild(viz);
-        lastViz = viz;
 
         if (data.audioUrl) {
-          player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
+          const resolved = resolveAudioUrl(data.audioUrl);
+          if (resolved) {
+            player.crossOrigin = "anonymous";
+            player.src = resolved;
 
-          const showViz = async () => {
-            if (lastViz) {
-              lastViz.style.display = "inline-flex";
+            const showViz = async () => {
+              viz.style.display = "inline-flex";
               setupAudioAnalyser();
               try { await audioCtx.resume(); } catch {}
-              animateBars(lastViz);
-            }
-            startSpeakingEffect();
-          };
-          const hideViz = () => {
-            if (lastViz) lastViz.style.display = "none";
-            stopSpeakingEffect();
-          };
+              animateBars(viz);
+              startSpeakingEffect();
+            };
+            const hideViz = () => {
+              viz.style.display = "none";
+              stopSpeakingEffect();
+            };
 
-          player.addEventListener("playing", showViz, { once: true });
-          player.addEventListener("ended",  hideViz, { once: true });
-          player.addEventListener("pause",  hideViz, { once: true });
-          player.addEventListener("error",  hideViz, { once: true });
+            player.addEventListener("playing", showViz, { once: true });
+            player.addEventListener("ended",  hideViz, { once: true });
+            player.addEventListener("pause",  hideViz, { once: true });
+            player.addEventListener("error",  hideViz, { once: true });
 
-          try { if (userHasInteracted) await player.play(); } catch {}
+            await tryPlay();
+          }
         }
       } catch (err) {
         if (typingActive) { typing.remove(); typingActive = false; }
@@ -351,3 +356,4 @@
   </script>
 </body>
 </html>
+
