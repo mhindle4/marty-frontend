@@ -1,0 +1,59 @@
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+let paddle = { x: c.width/2 - 60, y: c.height - 24, w: 120, h: 12, speed: 8 };
+let ball = { x: c.width/2, y: c.height/2, r: 8, vx: 4, vy: -4 };
+let keys = {};
+const rows = 5, cols = 10, bricks = [], bw=72, bh=20, gap=6, offset=40;
+for (let r=0; r<rows; r++) for (let i=0;i<cols;i++) bricks.push({ x: 16 + i*(bw+gap), y: offset + r*(bh+gap), hit:false });
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup",   e => keys[e.key] = false);
+
+function update() {
+  if (keys["ArrowLeft"] || keys["a"])  paddle.x -= paddle.speed;
+  if (keys["ArrowRight"]|| keys["d"])  paddle.x += paddle.speed;
+  paddle.x = Math.max(0, Math.min(c.width - paddle.w, paddle.x));
+
+  ball.x += ball.vx; ball.y += ball.vy;
+  if (ball.x < ball.r || ball.x > c.width - ball.r) ball.vx *= -1;
+  if (ball.y < ball.r) ball.vy *= -1;
+
+  // paddle collide
+  if (ball.y + ball.r >= paddle.y && ball.x >= paddle.x && ball.x <= paddle.x + paddle.w && ball.vy > 0) {
+    ball.vy *= -1;
+    const hitPos = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+    ball.vx = hitPos * 6; // angle control
+  }
+
+  // bricks
+  for (const b of bricks) {
+    if (b.hit) continue;
+    if (ball.x > b.x && ball.x < b.x + bw && ball.y - ball.r < b.y + bh && ball.y + ball.r > b.y) {
+      b.hit = true;
+      ball.vy *= -1;
+      break;
+    }
+  }
+
+  // lose
+  if (ball.y - ball.r > c.height) {
+    // reset
+    ball = { x: c.width/2, y: c.height/2, r: 8, vx: 4, vy: -4 };
+  }
+}
+
+function draw() {
+  ctx.clearRect(0,0,c.width,c.height);
+  // paddle
+  ctx.fillStyle = "#45a29e"; ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+  // ball
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fillStyle="#66fcf1"; ctx.fill();
+  // bricks
+  for (const b of bricks) {
+    if (b.hit) continue;
+    ctx.fillStyle = "#0e6655"; ctx.fillRect(b.x, b.y, bw, bh);
+  }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+loop();

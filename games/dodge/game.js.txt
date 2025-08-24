@@ -1,0 +1,83 @@
+// Simple “Dodge” using Kaboom (no build tools)
+kaboom({
+  global: true,
+  canvas: document.getElementById("game"),
+  background: [11, 12, 16],
+  width: window.innerWidth,
+  height: window.innerHeight - 56,
+  scale: 1,
+});
+
+// player
+const SPEED = 360;
+const player = add([
+  pos(width() / 2, height() - 80),
+  rect(32, 32),
+  origin("center"),
+  color(69, 162, 158),
+  area(),
+  "player",
+]);
+
+let score = 0;
+const scoreText = add([
+  text("Score: 0", { size: 24 }),
+  pos(16, 16),
+  layer("ui"),
+]);
+
+function spawnBlock() {
+  const w = rand(24, 60);
+  const x = rand(w, width() - w);
+  const speed = rand(180, 380);
+  add([
+    pos(x, -50),
+    rect(w, 24),
+    color(14, 102, 85),
+    area(),
+    move(DOWN, speed),
+    offscreen({ destroy: true }),
+    "block",
+  ]);
+}
+
+loop(0.8, spawnBlock);
+
+// movement
+onUpdate(() => {
+  if (isKeyDown("left") || isKeyDown("a"))  player.move(-SPEED, 0);
+  if (isKeyDown("right")|| isKeyDown("d"))  player.move(SPEED, 0);
+  if (isKeyDown("up")   || isKeyDown("w"))  player.move(0, -SPEED);
+  if (isKeyDown("down") || isKeyDown("s"))  player.move(0, SPEED);
+  player.pos.x = clamp(player.pos.x, 16, width() - 16);
+  player.pos.y = clamp(player.pos.y, 56, height() - 16);
+});
+
+// scoring
+onUpdate("block", (b) => {
+  if (b.pos.y > height() + 10) {
+    score++;
+    scoreText.text = `Score: ${score}`;
+    destroy(b);
+  }
+});
+
+// collision = game over
+player.onCollide("block", () => {
+  add([
+    text(`Game Over\nScore: ${score}\nPress R to restart`, { size: 36, align: "center" }),
+    pos(width() / 2, height() / 2),
+    origin("center"),
+  ]);
+  every("block", (b) => destroy(b));
+  player.destroy();
+  onKeyPress("r", () => go("main"));
+});
+
+scene("main", () => { /* already set up */ });
+go("main");
+
+// resize handling
+window.addEventListener("resize", () => {
+  setCamScale(vec2(1, 1));
+});

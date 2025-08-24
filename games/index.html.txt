@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Marty – Games</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background:#0b0c10; color:#eaf0f1; }
+    .shell { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+    nav { margin-bottom: 24px; text-align: center; }
+    nav a { color:#66fcf1; margin: 0 12px; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    h1 { text-align: center; margin: 8px 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 16px; }
+    .card { background:#111417; border-radius: 16px; padding: 16px; border: 1px solid #222; }
+    .card h3 { margin: 8px 0; }
+    .card p { opacity: 0.85; }
+    .card a { display:inline-block; margin-top: 8px; background:#45a29e; color:#0b0c10; padding:10px 12px; border-radius:10px; text-decoration:none; font-weight:700; }
+    .card a:hover { background:#66fcf1; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../chat.html">Chat</a>
+      <a href="../about.html">About</a>
+      <a href="../contact.html">Contact</a>
+      <a href="./index.html" aria-current="page">Games</a>
+    </nav>
+
+    <h1>Play with Marty</h1>
+    <div class="grid">
+      <div class="card">
+        <h3>Dodge</h3>
+        <p>Quick arcade game: move Marty and dodge falling blocks. Arrow keys or WASD.</p>
+        <a href="./dodge/" aria-label="Play Dodge">Play</a>
+      </div>
+      <div class="card">
+        <h3>Breakout</h3>
+        <p>Classic brick-breaker. Move the paddle, smash the bricks, don’t drop the ball!</p>
+        <a href="./breakout/" aria-label="Play Breakout">Play</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

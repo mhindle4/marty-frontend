@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Breakout – Marty</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; background:#0b0c10; color:#eaf0f1; font-family: system-ui, Arial, sans-serif; }
+    nav { text-align:center; padding: 12px; }
+    nav a { color:#66fcf1; text-decoration:none; margin: 0 8px; }
+    canvas { display:block; margin: 0 auto; background:#111417; border:1px solid #222; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="../../index.html">Home</a>
+    <a href="../../games/index.html">Games</a>
+  </nav>
+  <canvas id="c" width="800" height="560"></canvas>
+  <script src="./game.js"></script>
+</body>
+</html>
