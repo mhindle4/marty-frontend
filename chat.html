@@ -1,11 +1,10 @@
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Marty – Chat</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="marty-avatar.jpg" />
   <style>
     :root { color-scheme: dark; }
     body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0b0c10; color:#eaf0f1; }
@@ -16,28 +15,19 @@
 
     .hero { text-align: center; margin-top: 8px; }
     .marty-video {
-      width: 200px; height: 200px;
-      border-radius: 50%;
-      border: 3px solid #66fcf1;
-      object-fit: cover;
-      transition: box-shadow 0.3s ease, opacity 0.35s ease, filter 0.35s ease;
+      width: 200px; height: 200px; border-radius: 50%;
+      border: 3px solid #66fcf1; object-fit: cover;
+      transition: box-shadow .3s ease, opacity .35s ease, filter .35s ease;
     }
     .marty-video.speaking {
-      box-shadow: 0 0 20px 6px rgba(102,252,241,0.7);
-      animation: pulseGlow 1.5s infinite alternate;
-      opacity: 1;
-      filter: none;
+      box-shadow: 0 0 20px 6px rgba(102,252,241,.7);
+      animation: pulseGlow 1.5s infinite alternate; opacity: 1; filter: none;
     }
     .marty-video.fadeout {
-      animation: none;
-      box-shadow: 0 0 8px 2px rgba(102,252,241,0.35);
-      opacity: 0.9;
-      filter: saturate(0.9);
+      animation: none; box-shadow: 0 0 8px 2px rgba(102,252,241,.35);
+      opacity: .9; filter: saturate(.9);
     }
-    @keyframes pulseGlow {
-      from { box-shadow: 0 0 10px 2px rgba(102,252,241,0.5); }
-      to   { box-shadow: 0 0 20px 6px rgba(102,252,241,0.9); }
-    }
+    @keyframes pulseGlow { from { box-shadow: 0 0 10px 2px rgba(102,252,241,.5);} to { box-shadow: 0 0 20px 6px rgba(102,252,241,.9);} }
 
     h1 { margin: 12px 0 16px; text-align: center; }
 
@@ -63,23 +53,17 @@
     /* Push-to-talk mic button */
     #mic.listening {
       background: #e85d75 !important; 
-      color:#fff;
-      animation: micPulse 1s infinite;
+      color:#fff; animation: micPulse 1s infinite;
     }
     @keyframes micPulse {
-      0% { box-shadow: 0 0 0 0 rgba(232,93,117,0.6); }
+      0% { box-shadow: 0 0 0 0 rgba(232,93,117,.6); }
       70%{ box-shadow: 0 0 0 14px rgba(232,93,117,0); }
       100%{ box-shadow: 0 0 0 0 rgba(232,93,117,0); }
     }
 
     /* Speaking visualiser bars */
-    .speaking-bars {
-      display:inline-flex; align-items:flex-end; gap:3px; height:16px; margin-left:8px;
-    }
-    .speaking-bars .bar {
-      width:3px; height:4px; background:#66fcf1; border-radius:1px;
-      transition: height 0.1s ease;
-    }
+    .speaking-bars { display:inline-flex; align-items:flex-end; gap:3px; height:16px; margin-left:8px; }
+    .speaking-bars .bar { width:3px; height:4px; background:#66fcf1; border-radius:1px; transition: height .1s ease; }
 
     audio { display:none; }
   </style>
@@ -137,23 +121,31 @@
       if(!res.ok) throw new Error("Server error "+res.status);
       return res.json();
     }
-    function resolveAudioUrl(u){ if(!u) return null; return /^https?:\/\//i.test(u)?u:`${API_BASE}${u}`; }
+    function resolveAudioUrl(u){ if(!u) return null; return /^https?:\/\//i.test(u)?(u):(`${API_BASE}${u}`); }
     async function tryPlay(){ try{ await player.play(); playFallback.style.display="none"; } catch{ playFallback.style.display="inline-block"; } }
     playFallback.addEventListener("click",()=>tryPlay());
 
-    // --- Visualiser ---
-    let audioCtx, analyser, dataArray, sourceNode, rafId;
-    function setupAnalyser(){
-      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-      if(sourceNode){ try{sourceNode.disconnect();}catch{}; try{analyser.disconnect();}catch{} }
-      sourceNode=audioCtx.createMediaElementSource(player);
-      analyser=audioCtx.createAnalyser();
-      analyser.fftSize=64;
-      dataArray=new Uint8Array(analyser.frequencyBinCount);
-      sourceNode.connect(analyser); analyser.connect(audioCtx.destination);
+    /* ---------- Single, reusable Web Audio graph (FIX) ---------- */
+    let audioCtx = null, sourceNode = null, analyser = null, dataArray = null, rafId = null;
+
+    function ensureAudioGraph() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!sourceNode) {
+        // Create ONCE per page lifetime
+        sourceNode = audioCtx.createMediaElementSource(player);
+      }
+      if (!analyser) {
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        // Connect once: player -> analyser -> destination
+        sourceNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+      }
     }
+
     function animateBars(viz){
-      if(!analyser) return;
+      if (!analyser) return;
       analyser.getByteFrequencyData(dataArray);
       const avgLow=dataArray.slice(0,5).reduce((a,b)=>a+b,0)/5;
       const avgMid=dataArray.slice(5,15).reduce((a,b)=>a+b,0)/10;
@@ -167,11 +159,11 @@
       }
       rafId=requestAnimationFrame(()=>animateBars(viz));
     }
-    function stopBars(){ if(rafId) cancelAnimationFrame(rafId); }
+    function stopBars(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; }
 
-    // --- Video glow ---
+    /* ---------- Video glow control ---------- */
     function startSpeakingEffect(){
-      try{ martyVideo.currentTime=0; }catch{}
+      try{ martyVideo.currentTime = 0; }catch{}
       martyVideo.play().catch(()=>{});
       martyVideo.classList.remove("fadeout");
       martyVideo.classList.add("speaking");
@@ -179,11 +171,11 @@
     function stopSpeakingEffect(){
       martyVideo.classList.remove("speaking");
       martyVideo.classList.add("fadeout");
-      setTimeout(()=>{ try{martyVideo.pause();}catch{} },350);
+      setTimeout(()=>{ try{ martyVideo.pause(); }catch{} }, 350);
       stopBars();
     }
 
-    // --- Chat flow ---
+    /* ---------- Chat flow ---------- */
     form.addEventListener("submit",async e=>{
       e.preventDefault(); userHasInteracted=true;
       const text=input.value.trim(); if(!text) return;
@@ -193,27 +185,40 @@
       try{
         const data=await sendToMarty(text);
         reply.textContent=data.text||"(no response)";
+
         if(data.audioUrl){
           const viz=document.createElement("span");
           viz.className="speaking-bars";
           viz.innerHTML='<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
           reply.appendChild(viz);
 
-          player.src=resolveAudioUrl(data.audioUrl);
-          player.addEventListener("playing",async()=>{
-            viz.style.display="inline-flex";
-            setupAnalyser(); try{await audioCtx.resume();}catch{}
-            animateBars(viz); startSpeakingEffect();
-          },{once:true});
-          ["ended","pause","error"].forEach(ev=>{
-            player.addEventListener(ev,()=>{ viz.style.display="none"; stopSpeakingEffect(); },{once:true});
-          });
-          await tryPlay();
+          const url = resolveAudioUrl(data.audioUrl);
+          if (url) {
+            player.crossOrigin = "anonymous";
+            player.src = url;
+
+            player.addEventListener("playing", async () => {
+              viz.style.display = "inline-flex";
+              ensureAudioGraph();            // <-- create/reuse ONCE
+              try { await audioCtx.resume(); } catch {}
+              animateBars(viz);
+              startSpeakingEffect();
+            }, { once: true });
+
+            const stopOnce = () => { viz.style.display="none"; stopSpeakingEffect(); };
+            player.addEventListener("ended",  stopOnce, { once: true });
+            player.addEventListener("pause",  stopOnce, { once: true });
+            player.addEventListener("error",  stopOnce, { once: true });
+
+            await tryPlay();
+          }
         }
-      }catch(err){ reply.textContent="Error talking to Marty."; console.error(err); }
+      }catch(err){
+        reply.textContent="Error talking to Marty."; console.error(err);
+      }
     });
 
-    // --- Push-to-Talk mic ---
+    /* ---------- Push-to-Talk mic ---------- */
     const RECO_LANG="en-GB"; let rec=null,listening=false,stopping=false,interimText="",finalText="";
     function createRecognizer(){
       const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -227,14 +232,15 @@
         }
         input.value=(finalText+" "+interimText).trim();
       };
-      r.onend=()=>{ if(stopping){ stopping=false; micBtn.classList.remove("listening"); listening=false; if(input.value.trim()) form.requestSubmit(); } else{ micBtn.classList.remove("listening"); listening=false; } };
+      r.onend=()=>{ if(stopping){ stopping=false; micBtn.classList.remove("listening"); listening=false; if(input.value.trim()) form.requestSubmit(); } else { micBtn.classList.remove("listening"); listening=false; } };
       r.onerror=e=>{ console.error("Speech error:",e.error); micBtn.classList.remove("listening"); listening=false; stopping=false; if(e.error==="not-allowed") alert("Mic permission blocked. Allow mic in browser."); };
       return r;
     }
-    function startPTT(ev){ ev.preventDefault(); userHasInteracted=true; if(listening) return; rec=createRecognizer(); if(!rec) return; interimText=""; finalText=""; input.value=""; stopping=false; listening=true; micBtn.classList.add("listening"); try{rec.start();}catch{} }
-    function stopPTT(){ if(!listening||!rec) return; stopping=true; try{rec.stop();}catch{} }
+    function startPTT(ev){ ev.preventDefault(); userHasInteracted=true; if(listening) return; rec=createRecognizer(); if(!rec) return; interimText=""; finalText=""; input.value=""; stopping=false; listening=true; micBtn.classList.add("listening"); try{ rec.start(); }catch{} }
+    function stopPTT(){ if(!listening||!rec) return; stopping=true; try{ rec.stop(); }catch{} }
     micBtn.addEventListener("mousedown",startPTT); window.addEventListener("mouseup",stopPTT);
     micBtn.addEventListener("touchstart",e=>{ startPTT(e); },{passive:false}); window.addEventListener("touchend",()=>{ stopPTT(); });
   </script>
 </body>
 </html>
+
