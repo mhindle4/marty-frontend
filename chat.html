@@ -1,5 +1,4 @@
 
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,12 +13,42 @@
     nav a { color: #66fcf1; margin: 0 12px; text-decoration: none; }
     nav a:hover { text-decoration: underline; }
     .hero { text-align: center; margin-top: 8px; }
+
     .marty-video {
       width: 200px; height: 200px;
       border-radius: 50%;
       border: 3px solid #66fcf1;
       object-fit: cover;
+      /* smooth visual transitions */
+      transition: box-shadow 0.3s ease, opacity 0.35s ease, filter 0.35s ease;
+      opacity: 0.95;               /* calm idle look */
+      filter: saturate(0.95);
     }
+    /* Glow + active look while speaking */
+    .marty-video.speaking {
+      box-shadow: 0 0 20px 6px rgba(102, 252, 241, 0.7);
+      animation: pulseGlow 1.5s infinite alternate;
+      opacity: 1;
+      filter: none;
+    }
+    /* Fade-out when finishing speaking (pause on last frame) */
+    .marty-video.fadeout {
+      animation: none;                 /* stop glow animation */
+      box-shadow: 0 0 8px 2px rgba(102, 252, 241, 0.35);
+      opacity: 0.88;                   /* gentle fade, not to 0 */
+      filter: saturate(0.9);
+    }
+
+    .avatar.speaking {
+      box-shadow: 0 0 12px 4px rgba(102, 252, 241, 0.7);
+      animation: pulseGlow 1.5s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 10px 2px rgba(102, 252, 241, 0.5); }
+      to   { box-shadow: 0 0 20px 6px rgba(102, 252, 241, 0.9); }
+    }
+
     h1 { margin: 12px 0 16px; text-align: center; }
 
     .chat {
@@ -30,7 +59,14 @@
 
     .row { display: flex; align-items: flex-start; gap: 8px; }
     .row.me { justify-content: flex-end; }
-    .avatar { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px; object-fit: cover; border: 2px solid #2b2f36; }
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      flex: 0 0 40px;
+      object-fit: cover;
+      border: 2px solid #2b2f36;
+      transition: box-shadow 0.3s ease;
+    }
     .spacer { width: 40px; height: 40px; }
 
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -54,22 +90,20 @@
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #45a29e; color: #0b0c10; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    audio { display: none; }  /* hide audio bar */
+    audio { display: none; }
 
-    /* Speaking visualizer inside bubble */
-    .speaking {
+    /* Real audio bars */
+    .speaking-bars {
       display: inline-flex; align-items: flex-end; gap: 3px; height: 16px; margin-left: 8px;
     }
-    .speaking .bar {
-      width: 3px; height: 4px; background: #66fcf1; border-radius: 1px;
-      animation: eq 1s infinite ease-in-out;
+    .speaking-bars .bar {
+      width: 3px;
+      height: 4px;
+      background: #66fcf1;
+      border-radius: 1px;
+      transition: height 0.1s ease;
     }
-    .speaking .bar:nth-child(2) { animation-delay: .1s; }
-    .speaking .bar:nth-child(3) { animation-delay: .2s; }
-    .speaking .bar:nth-child(4) { animation-delay: .3s; }
-    @keyframes eq { 0%,100%{height:4px;opacity:.7;} 50%{height:16px;opacity:1;} }
 
-    /* Scroll to bottom */
     #scrollBtn {
       position: fixed; bottom: 90px; right: 20px;
       background: #45a29e; color: #0b0c10; border: none; border-radius: 50%;
@@ -79,7 +113,6 @@
     }
     #scrollBtn:hover { background: #66fcf1; }
 
-    /* Mic push-to-talk */
     #mic.listening {
       background: #e85d75; color: #0b0c10; animation: micPulse 1s infinite;
     }
@@ -100,7 +133,7 @@
     </nav>
 
     <div class="hero">
-      <video autoplay loop muted playsinline class="marty-video">
+      <video id="martyVideo" loop muted playsinline class="marty-video">
         <source src="marty-loop-small.mp4?t=1" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -123,7 +156,7 @@
 
   <script>
     const API_BASE = "https://marty-backend.onrender.com";
-    const AVATAR_SRC = "marty-avatar.jpg?t=1"; // updated avatar snapshot
+    const AVATAR_SRC = "marty-avatar.jpg?t=1";
 
     const chat = document.getElementById("chat");
     const form = document.getElementById("chatForm");
@@ -132,8 +165,10 @@
     const sendBtn = document.getElementById("sendBtn");
     const player = document.getElementById("player");
     const scrollBtn = document.getElementById("scrollBtn");
+    const martyVideo = document.getElementById("martyVideo");
 
     let userHasInteracted = false;
+    let lastBotAvatar = null;
 
     function scrollToBottom() { chat.scrollTop = chat.scrollHeight; }
 
@@ -146,6 +181,7 @@
         img.alt = "Marty avatar";
         img.className = "avatar";
         row.appendChild(img);
+        lastBotAvatar = img;
       } else {
         const spacer = document.createElement("div");
         spacer.className = "spacer";
@@ -189,18 +225,68 @@
       return res.json();
     }
 
-    function buildSpeakingOnlyBubble() {
-      const row = addRow("bot");
-      const bubble = document.createElement("div");
-      bubble.className = "msg";
-      bubble.textContent = "";
-      const viz = document.createElement("span");
-      viz.className = "speaking";
-      viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
-      bubble.appendChild(viz);
-      row.appendChild(bubble);
-      return { row, bubble, viz };
+    /* ---------- Real-time audio bars via Web Audio API ---------- */
+    let audioCtx, analyser, dataArray, sourceNode, rafId;
+    function setupAudioAnalyser() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (sourceNode) {
+        try { sourceNode.disconnect(); } catch {}
+        try { analyser && analyser.disconnect(); } catch {}
+      }
+      sourceNode = audioCtx.createMediaElementSource(player);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      const bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
+      sourceNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
     }
+    function animateBars(vizElement) {
+      if (!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+      const avgLow  = dataArray.slice(0, 5).reduce((a,b)=>a+b,0)/5;
+      const avgMid  = dataArray.slice(5, 15).reduce((a,b)=>a+b,0)/10;
+      const avgHigh = dataArray.slice(15, 30).reduce((a,b)=>a+b,0)/15;
+      const bars = vizElement.querySelectorAll(".bar");
+      if (bars.length >= 4) {
+        bars[0].style.height = Math.max(4, avgLow  / 8)  + "px";
+        bars[1].style.height = Math.max(4, avgMid  / 8)  + "px";
+        bars[2].style.height = Math.max(4, avgHigh / 8)  + "px";
+        bars[3].style.height = Math.max(4, (avgMid+avgHigh)/16) + "px";
+      }
+      rafId = requestAnimationFrame(() => animateBars(vizElement));
+    }
+    function stopBars() {
+      if (rafId) cancelAnimationFrame(rafId);
+    }
+
+    /* ---------- Speaking visual effects (video + avatar) ---------- */
+    function startSpeakingEffect() {
+      // rewind to start BEFORE each play so it doesn't resume mid-frame
+      try { martyVideo.currentTime = 0; } catch {}
+      martyVideo.play().catch(() => {});
+      martyVideo.classList.remove("fadeout");  // remove any fade from prior speak
+      martyVideo.classList.add("speaking");
+      if (lastBotAvatar) lastBotAvatar.classList.add("speaking");
+    }
+
+    // Smooth fade then pause on last frame (no snap to 0)
+    function stopSpeakingEffect() {
+      martyVideo.classList.remove("speaking");
+      martyVideo.classList.add("fadeout");
+      if (lastBotAvatar) lastBotAvatar.classList.remove("speaking");
+      // Wait for the CSS fade to complete (~350ms), then pause (keeps current frame)
+      setTimeout(() => {
+        try { martyVideo.pause(); } catch {}
+        // DO NOT reset currentTime here — we want the "freeze frame" look.
+      }, 360);
+      stopBars();
+    }
+
+    /* ---------- Chat flow ---------- */
+    let lastViz = null; // track viz of the current bot message
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -208,55 +294,48 @@
       const text = input.value.trim();
       if (!text) return;
 
-      const mine = addBubble(text, "me");
+      addBubble(text, "me");
       input.value = "";
 
       let typing = addTypingBubble();
       let typingActive = true;
-      let speakingBubble = null;
 
       sendBtn.disabled = true;
       micBtn.disabled = true;
 
-      const onPlaying = () => {
-        if (typingActive) {
-          speakingBubble = buildSpeakingOnlyBubble();
-          typing.replaceWith(speakingBubble.row);
-          typingActive = false;
-          scrollToBottom();
-        }
-      };
-      const onStopSpeak = () => {};
-
-      player.addEventListener("playing", onPlaying, { once: true });
-      player.addEventListener("ended", onStopSpeak, { once: true });
-      player.addEventListener("error", onStopSpeak, { once: true });
-
       try {
-        const data = await sendToMarty(mine.textContent);
-
+        const data = await sendToMarty(text);
         if (typingActive) { typing.remove(); typingActive = false; }
 
-        if (speakingBubble) {
-          speakingBubble.bubble.textContent = data.text || "(no response)";
-        } else {
-          const reply = addBubble(data.text || "(no response)", "bot");
-          const viz = document.createElement("span");
-          viz.className = "speaking";
-          viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
-          reply.appendChild(viz);
-          speakingBubble = { row: reply.parentElement, bubble: reply, viz };
-        }
+        const reply = addBubble(data.text || "(no response)", "bot");
+        const viz = document.createElement("span");
+        viz.className = "speaking-bars";
+        viz.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
+        reply.appendChild(viz);
+        lastViz = viz;
 
         if (data.audioUrl) {
           player.src = `${API_BASE}${data.audioUrl}?t=${Date.now()}`;
-          const showViz = () => speakingBubble && (speakingBubble.viz.style.display = "inline-flex");
-          const hideViz = () => speakingBubble && (speakingBubble.viz.style.display = "none");
-          player.addEventListener("playing", showViz);
-          player.addEventListener("ended", hideViz);
-          player.addEventListener("pause", hideViz);
-          player.addEventListener("stalled", hideViz);
-          player.addEventListener("error", hideViz);
+
+          const showViz = async () => {
+            if (lastViz) {
+              lastViz.style.display = "inline-flex";
+              setupAudioAnalyser();
+              try { await audioCtx.resume(); } catch {}
+              animateBars(lastViz);
+            }
+            startSpeakingEffect();
+          };
+          const hideViz = () => {
+            if (lastViz) lastViz.style.display = "none";
+            stopSpeakingEffect();
+          };
+
+          player.addEventListener("playing", showViz, { once: true });
+          player.addEventListener("ended",  hideViz, { once: true });
+          player.addEventListener("pause",  hideViz, { once: true });
+          player.addEventListener("error",  hideViz, { once: true });
+
           try { if (userHasInteracted) await player.play(); } catch {}
         }
       } catch (err) {
@@ -269,71 +348,6 @@
         input.focus();
       }
     });
-
-    const RECO_LANG = "en-GB";
-    let rec = null, listening = false, stopping = false, interimText = "", finalText = "";
-
-    function createRecognizer() {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) { alert("Speech recognition not supported in this browser. Try Chrome on desktop."); return null; }
-      const r = new SR();
-      r.lang = RECO_LANG;
-      r.interimResults = true;
-      r.continuous = true;
-      r.maxAlternatives = 1;
-
-      r.onresult = (e) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const res = e.results[i];
-          if (res.isFinal) { finalText += res[0].transcript + " "; interimText = ""; }
-          else { interimText = res[0].transcript; }
-        }
-        input.value = (finalText + " " + interimText).trim();
-      };
-
-      r.onend = () => {
-        if (stopping) { stopping = false; micBtn.classList.remove("listening"); listening = false; if (input.value.trim()) form.requestSubmit(); }
-        else { micBtn.classList.remove("listening"); listening = false; }
-      };
-
-      r.onerror = (e) => {
-        console.error("Speech error:", e.error);
-        micBtn.classList.remove("listening");
-        listening = false;
-        stopping = false;
-        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-          alert("Microphone permission is blocked. Click the padlock in the address bar and allow the mic.");
-        }
-      };
-      return r;
-    }
-
-    function startPTT(ev) {
-      ev.preventDefault();
-      userHasInteracted = true;
-      if (listening) return;
-      rec = createRecognizer();
-      if (!rec) return;
-      interimText = ""; finalText = "";
-      input.value = "";
-      stopping = false;
-      listening = true;
-      micBtn.classList.add("listening");
-      try { rec.start(); } catch {}
-    }
-
-    function stopPTT() { if (!listening || !rec) return; stopping = true; try { rec.stop(); } catch {} }
-
-    micBtn.addEventListener("mousedown", startPTT);
-    window.addEventListener("mouseup", stopPTT);
-    micBtn.addEventListener("touchstart", (e) => { startPTT(e); }, { passive: false });
-    window.addEventListener("touchend", () => { stopPTT(); });
-
-    chat.addEventListener("scroll", () => {
-      const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
-      scrollBtn.style.display = atBottom ? "none" : "flex";
-    });
-    scrollBtn.addEventListener("click", scrollToBottom);
   </script>
 </body>
 </html>
