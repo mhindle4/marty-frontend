@@ -1,5 +1,6 @@
-
 // Simple “Dodge” – avoid falling blocks, score for each second survived.
+
+console.log("Dodge game script loaded!");  // ✅ Debug check
 
 const GAME_MARGIN_TOP = 56; // reserve space for nav
 const BG = [11, 12, 16];
@@ -22,7 +23,7 @@ const SPEED = 420;
 const player = add([
   pos(width() / 2, height() - 90),
   rect(32, 32),
-  anchor("center"),      // <— CHANGED from origin("center")
+  anchor("center"),      // ✅ replaced origin() with anchor()
   C_PLAYER,
   area(),
   "player",
