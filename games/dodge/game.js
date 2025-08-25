@@ -1,4 +1,5 @@
-// Simple “Dodge” – avoid falling blocks, score for each block survived.
+
+// Simple “Dodge” – avoid falling blocks, score for each second survived.
 
 const GAME_MARGIN_TOP = 56; // reserve space for nav
 const BG = [11, 12, 16];
@@ -21,7 +22,7 @@ const SPEED = 420;
 const player = add([
   pos(width() / 2, height() - 90),
   rect(32, 32),
-  origin("center"),
+  anchor("center"),      // <— CHANGED from origin("center")
   C_PLAYER,
   area(),
   "player",
@@ -33,7 +34,7 @@ const scoreText = add([
   text("Score: 0", { size: 28, font: "sink" }),
   pos(16, 12),
   fixed(),
-  { update(t) { this.color = C_TEXT; } },
+  { update() { this.color = C_TEXT; } },
 ]);
 
 // Spawn blocks
@@ -68,14 +69,6 @@ onUpdate(() => {
   player.pos.y = clamp(player.pos.y, 16, height() - 16);
 });
 
-// Score when blocks pass bottom (offscreen() destroys; so award on y threshold)
-onUpdate("block", (b) => {
-  if (b.pos.y > height() + 5) {
-    // scored via survival – but offscreen destroy already happened
-    // Instead, award a small passive score over time:
-  }
-});
-
 // Passive score tick (every second)
 loop(1, () => {
   score++;
@@ -96,20 +89,16 @@ player.onCollide("block", () => {
   ]);
 
   add([
-    text(`Game Over\nScore: ${score}\nPress R to restart`, {
-      size: 40,
-      align: "center",
-      lineSpacing: 10,
-    }),
+    text(`Game Over\nScore: ${score}\nPress R to restart`, { size: 40, align: "center", lineSpacing: 10 }),
     pos(width() / 2, height() / 2),
-    origin("center"),
+    anchor("center"),
     { color: C_TEXT },
   ]);
 
   every("block", (b) => destroy(b));
   player.destroy();
 
-  onKeyPress("r", () => go("main"));
+  onKeyPress("r", () => location.reload());
 });
 
 // Scene/bootstrap
@@ -157,7 +146,6 @@ function applyJoystick(dx, dy) {
 pad.addEventListener("touchstart", (e) => {
   activeTouch = e.changedTouches[0].identifier;
 });
-
 pad.addEventListener("touchmove", (e) => {
   const t = Array.from(e.changedTouches).find(t => t.identifier === activeTouch);
   if (!t) return;
@@ -181,4 +169,3 @@ pad.addEventListener("touchcancel", endTouch);
 if (!("ontouchstart" in window)) {
   pad.style.display = "none";
 }
-
