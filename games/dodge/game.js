@@ -1,6 +1,6 @@
 // Simple “Dodge” – avoid falling blocks, score for each second survived.
 
-console.log("Dodge game script loaded!");  // ✅ Debug check
+console.log("Dodge game script loaded!");  // ✅ Debug check (should appear in DevTools console)
 
 const GAME_MARGIN_TOP = 56; // reserve space for nav
 const BG = [11, 12, 16];
@@ -23,7 +23,7 @@ const SPEED = 420;
 const player = add([
   pos(width() / 2, height() - 90),
   rect(32, 32),
-  anchor("center"),      // ✅ replaced origin() with anchor()
+  anchor("center"),      // ✅ Kaboom v3000+ uses anchor(), not origin()
   C_PLAYER,
   area(),
   "player",
@@ -147,6 +147,7 @@ function applyJoystick(dx, dy) {
 pad.addEventListener("touchstart", (e) => {
   activeTouch = e.changedTouches[0].identifier;
 });
+
 pad.addEventListener("touchmove", (e) => {
   const t = Array.from(e.changedTouches).find(t => t.identifier === activeTouch);
   if (!t) return;

@@ -32,8 +32,26 @@
   <canvas id="game"></canvas>
   <div id="pad" class="pad" aria-hidden="true"><div id="stick" class="stick"></div></div>
 
-  <!-- Kaboom CDN (latest) -->
+  <!-- 1) Kaboom must load FIRST -->
   <script src="https://unpkg.com/kaboom/dist/kaboom.js"></script>
+
+  <!-- 2) Your game code -->
   <script src="./game.js"></script>
+
+  <!-- 3) Tiny diagnostics so we can see what's happening -->
+  <script>
+    console.log("[diag] window.kaboom =", typeof window.kaboom);
+    try {
+      // If kaboom loaded, calling it with no args returns a function (in older builds) or throws.
+      console.log("[diag] kaboom type:", typeof kaboom);
+    } catch (e) {
+      console.warn("[diag] kaboom not callable:", e);
+    }
+
+    // Check whether the browser could fetch game.js (helps catch 404 / path issues)
+    fetch("./game.js", { cache: "no-store" })
+      .then(r => console.log("[diag] fetch game.js status:", r.status))
+      .catch(err => console.warn("[diag] fetch game.js failed:", err));
+  </script>
 </body>
 </html>
