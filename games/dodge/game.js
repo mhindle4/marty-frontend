@@ -1,6 +1,6 @@
-// Simple “Dodge” – avoid falling blocks, score for each second survived.
+// Dodge — everything created inside the scene so it survives go("main")
 
-console.log("Dodge game script loaded!");  // ✅ Debug check
+console.log("Dodge game script loaded!");  // ✅ should show in console
 
 const GAME_MARGIN_TOP = 56; // reserve space for nav
 const BG = [11, 12, 16];
@@ -18,118 +18,118 @@ const C_PLAYER = color(69, 162, 158);
 const C_BLOCK  = color(14, 102, 85);
 const C_TEXT   = color(230, 240, 241);
 
-// 🔎 DEBUG: draw a bright red square in the center so we know it's rendering
-add([
-  rect(50, 50),
-  pos(width() / 2, height() / 2),
-  anchor("center"),
-  color(255, 0, 0),
-  opacity(0.7),
-  z(1000),
-]);
-
-// 🔎 DEBUG label
-add([
-  text("READY", { size: 20 }),
-  pos(12, 8),
-  color(200, 240, 240),
-  fixed(),
-  z(1000),
-]);
-
-// Player
-const SPEED = 420;
-const player = add([
-  pos(width() / 2, height() - 90),
-  rect(32, 32),
-  anchor("center"),      // ✅ Kaboom v3000+ uses anchor(), not origin()
-  C_PLAYER,
-  area(),
-  "player",
-]);
-
-// 🔎 DEBUG: log player position periodically
-loop(1, () => {
-  console.log("[player] x:", Math.round(player.pos.x), "y:", Math.round(player.pos.y), "canvas:", width(), height());
-});
-
-// Score UI
-let score = 0;
-const scoreText = add([
-  text("Score: 0", { size: 28, font: "sink" }),
-  pos(16, 36), // moved under the READY label
-  fixed(),
-  {
-    update() { this.color = C_TEXT; },
-  },
-]);
-
-// Spawn blocks
-function spawnBlock() {
-  const w = rand(24, 64);
-  const x = rand(w + 8, width() - (w + 8));
-  const speed = rand(180, 380);
+// Main scene
+scene("main", () => {
+  // 🔎 DEBUG: draw a bright red square in the center so we know it's rendering
   add([
-    pos(x, -40),
-    rect(w, 22),
-    C_BLOCK,
-    outline(2, rgb(20, 30, 30)),
-    area(),
-    move(DOWN, speed),
-    offscreen({ destroy: true }),
-    "block",
+    rect(50, 50),
+    pos(width() / 2, height() / 2),
+    anchor("center"),
+    color(255, 0, 0),
+    opacity(0.7),
   ]);
-}
-loop(0.75, spawnBlock);
 
-// Keyboard movement
-onUpdate(() => {
-  let vx = 0, vy = 0;
-  if (isKeyDown("left") || isKeyDown("a"))  vx -= SPEED;
-  if (isKeyDown("right")|| isKeyDown("d"))  vx += SPEED;
-  if (isKeyDown("up")   || isKeyDown("w"))  vy -= SPEED;
-  if (isKeyDown("down") || isKeyDown("s"))  vy += SPEED;
-  player.move(vx, vy);
-
-  // Clamp inside canvas
-  player.pos.x = clamp(player.pos.x, 16, width() - 16);
-  player.pos.y = clamp(player.pos.y, 16, height() - 16);
-});
-
-// Passive score tick (every second)
-loop(1, () => {
-  score++;
-  scoreText.text = `Score: ${score}`;
-});
-
-// Collision = game over
-player.onCollide("block", () => {
+  // 🔎 DEBUG label
   add([
-    rect(width(), height()),
-    pos(0, 0),
-    color(0, 0, 0),
-    opacity(0),
+    text("READY", { size: 20 }),
+    pos(12, 8),
+    color(200, 240, 240),
+    fixed(),
+  ]);
+
+  // Player
+  const SPEED = 420;
+  const player = add([
+    pos(width() / 2, height() - 90),
+    rect(32, 32),
+    anchor("center"),      // Kaboom v3000+ uses anchor(), not origin()
+    C_PLAYER,
+    area(),
+    "player",
+  ]);
+
+  // 🔎 DEBUG: log player position periodically
+  loop(1, () => {
+    console.log("[player] x:", Math.round(player.pos.x), "y:", Math.round(player.pos.y), "canvas:", width(), height());
+  });
+
+  // Score UI
+  let score = 0;
+  const scoreText = add([
+    text("Score: 0", { size: 28, font: "sink" }),
+    pos(16, 36), // under the READY label
+    fixed(),
     {
-      add() { this.t = 0; },
-      update() { this.t += dt(); this.opacity = Math.min(0.5, this.t * 0.8); },
+      update() { this.color = C_TEXT; },
     },
   ]);
 
-  add([
-    text(`Game Over\nScore: ${score}\nPress R to restart`, { size: 40, align: "center", lineSpacing: 10 }),
-    pos(width() / 2, height() / 2),
-    anchor("center"),
-    { color: C_TEXT },
-  ]);
+  // Spawn blocks
+  function spawnBlock() {
+    const w = rand(24, 64);
+    const x = rand(w + 8, width() - (w + 8));
+    const speed = rand(180, 380);
+    add([
+      pos(x, -40),
+      rect(w, 22),
+      C_BLOCK,
+      outline(2, rgb(20, 30, 30)),
+      area(),
+      move(DOWN, speed),
+      offscreen({ destroy: true }),
+      "block",
+    ]);
+  }
+  loop(0.75, spawnBlock);
 
-  every("block", (b) => destroy(b));
-  player.destroy();
+  // Keyboard movement
+  onUpdate(() => {
+    let vx = 0, vy = 0;
+    if (isKeyDown("left") || isKeyDown("a"))  vx -= SPEED;
+    if (isKeyDown("right")|| isKeyDown("d"))  vx += SPEED;
+    if (isKeyDown("up")   || isKeyDown("w"))  vy -= SPEED;
+    if (isKeyDown("down") || isKeyDown("s"))  vy += SPEED;
+    player.move(vx, vy);
 
-  onKeyPress("r", () => location.reload());
+    // Clamp inside canvas
+    player.pos.x = clamp(player.pos.x, 16, width() - 16);
+    player.pos.y = clamp(player.pos.y, 16, height() - 16);
+  });
+
+  // Passive score tick (every second)
+  loop(1, () => {
+    score++;
+    scoreText.text = `Score: ${score}`;
+  });
+
+  // Collision = game over
+  player.onCollide("block", () => {
+    add([
+      rect(width(), height()),
+      pos(0, 0),
+      color(0, 0, 0),
+      opacity(0),
+      {
+        add() { this.t = 0; },
+        update() { this.t += dt(); this.opacity = Math.min(0.5, this.t * 0.8); },
+      },
+    ]);
+
+    add([
+      text(`Game Over\nScore: ${score}\nPress R to restart`, { size: 40, align: "center", lineSpacing: 10 }),
+      pos(width() / 2, height() / 2),
+      anchor("center"),
+      { color: C_TEXT },
+    ]);
+
+    every("block", (b) => destroy(b));
+    destroy(player);
+
+    onKeyPress("r", () => go("main"));
+  });
 });
 
-// Scene/bootstrap
-scene("main", () => {});
+// Boot into the scene (now objects persist)
 go("main");
 
 // Resize handling (reload is simplest to keep canvas sizing correct)
@@ -164,10 +164,17 @@ function applyJoystick(dx, dy) {
   const dead = 10;
   if (Math.abs(dx) < dead && Math.abs(dy) < dead) return;
   const nx = dx / 40, ny = dy / 40; // -1..1
-  player.move(nx * SPEED, ny * SPEED);
-  // Clamp inside canvas
-  player.pos.x = clamp(player.pos.x, 16, width() - 16);
-  player.pos.y = clamp(player.pos.y, 16, height() - 16);
+  // Move the player in the current scene (safe inside scene via onUpdate above)
+  // We nudge by setting a global velocity each frame using kaboom's onUpdate,
+  // but here we can directly move since applyJoystick fires often.
+  const SPEED = 420;
+  // Find player safely (exists only while scene runs)
+  const p = get("player")[0];
+  if (p) {
+    p.move(nx * SPEED, ny * SPEED);
+    p.pos.x = clamp(p.pos.x, 16, width() - 16);
+    p.pos.y = clamp(p.pos.y, 16, height() - 16);
+  }
 }
 
 pad.addEventListener("touchstart", (e) => {
