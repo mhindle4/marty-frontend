@@ -1,6 +1,6 @@
 // Simple “Dodge” – avoid falling blocks, score for each second survived.
 
-console.log("Dodge game script loaded!");  // ✅ Debug check (should appear in DevTools console)
+console.log("Dodge game script loaded!");  // ✅ Debug check
 
 const GAME_MARGIN_TOP = 56; // reserve space for nav
 const BG = [11, 12, 16];
@@ -18,6 +18,25 @@ const C_PLAYER = color(69, 162, 158);
 const C_BLOCK  = color(14, 102, 85);
 const C_TEXT   = color(230, 240, 241);
 
+// 🔎 DEBUG: draw a bright red square in the center so we know it's rendering
+add([
+  rect(50, 50),
+  pos(width() / 2, height() / 2),
+  anchor("center"),
+  color(255, 0, 0),
+  opacity(0.7),
+  z(1000),
+]);
+
+// 🔎 DEBUG label
+add([
+  text("READY", { size: 20 }),
+  pos(12, 8),
+  color(200, 240, 240),
+  fixed(),
+  z(1000),
+]);
+
 // Player
 const SPEED = 420;
 const player = add([
@@ -29,13 +48,20 @@ const player = add([
   "player",
 ]);
 
+// 🔎 DEBUG: log player position periodically
+loop(1, () => {
+  console.log("[player] x:", Math.round(player.pos.x), "y:", Math.round(player.pos.y), "canvas:", width(), height());
+});
+
 // Score UI
 let score = 0;
 const scoreText = add([
   text("Score: 0", { size: 28, font: "sink" }),
-  pos(16, 12),
+  pos(16, 36), // moved under the READY label
   fixed(),
-  { update() { this.color = C_TEXT; } },
+  {
+    update() { this.color = C_TEXT; },
+  },
 ]);
 
 // Spawn blocks
@@ -147,7 +173,6 @@ function applyJoystick(dx, dy) {
 pad.addEventListener("touchstart", (e) => {
   activeTouch = e.changedTouches[0].identifier;
 });
-
 pad.addEventListener("touchmove", (e) => {
   const t = Array.from(e.changedTouches).find(t => t.identifier === activeTouch);
   if (!t) return;
@@ -171,3 +196,4 @@ pad.addEventListener("touchcancel", endTouch);
 if (!("ontouchstart" in window)) {
   pad.style.display = "none";
 }
+
